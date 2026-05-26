@@ -276,24 +276,30 @@ export default function TimetablePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Timetable</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Build and manage the school timetable</p>
-        </div>
-        <div className="flex gap-2">
-          {tab === 'builder' && (
-            <button onClick={() => setAddSlot({ id: '', schoolId: '', academicYearId: '', name: 'New', periodNumber: 1, startTime: '', endTime: '', dayOfWeek: 1, isLesson: true })}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm">
-              <Plus className="h-4 w-4" /> Add Slot
-            </button>
-          )}
-          {tab === 'periods' && (
-            <button onClick={() => setPeriodOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm">
-              <Plus className="h-4 w-4" /> Add Period
-            </button>
-          )}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 p-5 shadow-md">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
+        <Calendar className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-white">Timetable</h1>
+            <p className="text-sm text-amber-100 mt-0.5">Build and manage the school timetable</p>
+          </div>
+          <div className="flex gap-2 self-start sm:self-auto">
+            {tab === 'builder' && (
+              <button onClick={() => setAddSlot({ id: '', schoolId: '', academicYearId: '', name: 'New', periodNumber: 1, startTime: '', endTime: '', dayOfWeek: 1, isLesson: true })}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-700 bg-white rounded-lg hover:bg-amber-50 transition-colors shadow-sm">
+                <Plus className="h-4 w-4" /> Add Slot
+              </button>
+            )}
+            {tab === 'periods' && (
+              <button onClick={() => setPeriodOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-700 bg-white rounded-lg hover:bg-amber-50 transition-colors shadow-sm">
+                <Plus className="h-4 w-4" /> Add Period
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Plus, ChevronRight, AlertTriangle,
-  CheckCircle2, Clock, BookOpen, Users, Search,
+  CheckCircle2, Clock, BookOpen, Users, Search, ArrowUpRight,
 } from 'lucide-react'
 import { assessmentApi, subjectsApi } from '@/lib/api'
 import type { ProgrammeOfAssessment, PoaStatus, SubjectClass } from '@/types'
@@ -256,20 +256,26 @@ export default function AssessmentPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assessment</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage Programmes of Assessment and capture learner marks
-          </p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 p-5 shadow-md">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
+        <ClipboardList className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-white">Assessment</h1>
+            <p className="text-sm text-blue-200 mt-0.5">
+              Manage Programmes of Assessment and capture learner marks
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-700 bg-white rounded-lg hover:bg-blue-50 transition-colors shadow-sm self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4" />
+            New POA
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          New POA
-        </button>
       </div>
 
       {/* Filters */}
@@ -304,14 +310,15 @@ export default function AssessmentPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total POAs',  value: poas.length,                            color: 'text-gray-900' },
-          { label: 'Drafts',      value: byStatus.DRAFT.length,                  color: 'text-gray-500' },
-          { label: 'Pending Review', value: byStatus.SUBMITTED.length,           color: 'text-amber-600' },
-          { label: 'Approved',    value: byStatus.APPROVED.length,               color: 'text-green-600' },
+          { label: 'Total POAs',     value: poas.length,                gradient: 'bg-gradient-to-br from-primary-600 to-primary-500' },
+          { label: 'Drafts',         value: byStatus.DRAFT.length,      gradient: 'bg-gradient-to-br from-slate-500 to-slate-400'    },
+          { label: 'Pending Review', value: byStatus.SUBMITTED.length,  gradient: 'bg-gradient-to-br from-amber-500 to-orange-500'   },
+          { label: 'Approved',       value: byStatus.APPROVED.length,   gradient: 'bg-gradient-to-br from-emerald-600 to-emerald-500' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl shadow-card p-4">
-            <p className="text-xs text-gray-500">{stat.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          <div key={stat.label} className={`relative overflow-hidden rounded-xl p-4 shadow-md ${stat.gradient}`}>
+            <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-white/10" />
+            <p className="text-xs font-medium text-white/80 relative">{stat.label}</p>
+            <p className="text-3xl font-bold text-white mt-1 relative tabular-nums">{stat.value}</p>
           </div>
         ))}
       </div>

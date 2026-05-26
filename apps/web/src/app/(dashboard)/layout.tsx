@@ -12,12 +12,14 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Redirect to login if not authenticated
+  // Redirect unauthenticated users to login; parents to their own portal
   React.useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
+    } else if (status === 'authenticated' && session?.user?.role === 'PARENT') {
+      router.push('/portal')
     }
-  }, [status, router])
+  }, [status, session, router])
 
   if (status === 'loading') {
     return (

@@ -12,6 +12,8 @@ import { SubjectsModule } from './modules/subjects/subjects.module'
 import { TimetableModule } from './modules/timetable/timetable.module'
 import { AttendanceModule } from './modules/attendance/attendance.module'
 import { AssessmentModule } from './modules/assessment/assessment.module'
+import { ReportsModule }    from './modules/reports/reports.module'
+import { PortalModule }     from './modules/portal/portal.module'
 import { TenantMiddleware } from './common/middleware/tenant.middleware'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './common/guards/roles.guard'
@@ -33,6 +35,8 @@ import { RolesGuard } from './common/guards/roles.guard'
     TimetableModule,
     AttendanceModule,
     AssessmentModule,
+    ReportsModule,
+    PortalModule,
   ],
   providers: [
     // Guards run in registration order.

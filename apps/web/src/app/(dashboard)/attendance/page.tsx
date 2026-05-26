@@ -263,10 +263,13 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-700 via-teal-600 to-cyan-600 p-5 shadow-md">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
+        <Users className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <div className="relative">
+          <h1 className="text-xl font-bold text-white">Attendance</h1>
+          <p className="text-sm text-teal-100 mt-0.5">
             Daily attendance registers — capture and review
           </p>
         </div>

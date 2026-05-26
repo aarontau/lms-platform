@@ -294,4 +294,54 @@ export const assessmentApi = {
     get<TermSbaResult[]>(`/assessment/at-risk/${subjectClassId}`),
 }
 
+// ─── Reports API ──────────────────────────────────────────────────────────────
+export const reportsApi = {
+  // Term report cards
+  generateTermReports: (data: { termId: string; classId: string }) =>
+    post<{ generated: number; skipped: number; total: number; message?: string }>(
+      '/reports/term/generate', data
+    ),
+  listReportCards: (params?: {
+    termId?:         string
+    classId?:        string
+    academicYearId?: string
+    status?:         string
+  }) => get<any[]>('/reports/term', { params }),
+  getReportCard: (id: string) =>
+    get<any>(`/reports/term/${id}`),
+  publishReport: (id: string) =>
+    patch<any>(`/reports/term/${id}/publish`),
+
+  // Annual results
+  calculateAnnualResults: (data: { academicYearId: string; classId: string }) =>
+    post<{ calculated: number; learners: number; subjects: number }>(
+      '/reports/annual/calculate', data
+    ),
+
+  // Promotion decisions
+  listPromotionDecisions: (academicYearId: string, classId?: string) =>
+    get<any[]>('/reports/promotion', { params: { academicYearId, classId } }),
+  recordPromotionDecision: (data: {
+    learnerId:      string
+    academicYearId: string
+    finalDecision:  'PROMOTE' | 'REPEAT' | 'PROGRESS'
+    isOverridden?:  boolean
+    overrideReason?:string
+  }) => post<any>('/reports/promotion', data),
+
+  // At-risk overview
+  getAtRiskSummary: (termId?: string) =>
+    get<any[]>('/reports/at-risk', { params: termId ? { termId } : undefined }),
+}
+
+// ─── Parent Portal API ────────────────────────────────────────────────────────
+export const portalApi = {
+  getMyChildren:             ()           => get<any[]>('/portal/children'),
+  getChildSummary:           (id: string) => get<any>(`/portal/children/${id}/summary`),
+  getChildMarks:             (id: string) => get<any[]>(`/portal/children/${id}/marks`),
+  getChildAttendance:        (id: string) => get<any>(`/portal/children/${id}/attendance`),
+  getChildUpcomingAssessments:(id: string)=> get<any[]>(`/portal/children/${id}/assessments`),
+  getChildReports:           (id: string) => get<any[]>(`/portal/children/${id}/reports`),
+}
+
 export default api

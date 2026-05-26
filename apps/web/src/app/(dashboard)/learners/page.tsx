@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   PlusCircle, Upload, Download, Search, X,
-  ChevronLeft, ChevronRight, AlertCircle,
+  ChevronLeft, ChevronRight, AlertCircle, GraduationCap,
 } from 'lucide-react'
 import { learnersApi, gradesApi } from '@/lib/api'
 import { LearnerTable } from '@/components/learners/LearnerTable'
@@ -84,38 +84,44 @@ export default function LearnersPage() {
   return (
     <div className="space-y-5">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Learners</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {meta
-              ? `${meta.total} learner${meta.total !== 1 ? 's' : ''} registered`
-              : 'Manage learner registrations'}
-          </p>
-        </div>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-700 via-violet-600 to-violet-500 p-5 shadow-md">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
+        <GraduationCap className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={downloadTemplate}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Template
-          </button>
-          <button
-            onClick={() => router.push('/learners/bulk-import')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Upload className="h-4 w-4" aria-hidden="true" />
-            Bulk Import
-          </button>
-          <button
-            onClick={() => router.push('/learners/register')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <PlusCircle className="h-4 w-4" aria-hidden="true" />
-            Register Learner
-          </button>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-white">Learners</h1>
+            <p className="text-sm text-violet-200 mt-0.5">
+              {meta
+                ? `${meta.total} learner${meta.total !== 1 ? 's' : ''} registered`
+                : 'Manage learner registrations'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={downloadTemplate}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-100 bg-white/15 border border-white/30 rounded-lg hover:bg-white/25 transition-colors backdrop-blur-sm"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Template
+            </button>
+            <button
+              onClick={() => router.push('/learners/bulk-import')}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-100 bg-white/15 border border-white/30 rounded-lg hover:bg-white/25 transition-colors backdrop-blur-sm"
+            >
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Bulk Import
+            </button>
+            <button
+              onClick={() => router.push('/learners/register')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-700 bg-white rounded-lg hover:bg-violet-50 transition-colors shadow-sm"
+            >
+              <PlusCircle className="h-4 w-4" aria-hidden="true" />
+              Register Learner
+            </button>
+          </div>
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   UserX,
   AlertTriangle,
+  Users as UsersIcon,
 } from 'lucide-react'
 import { usersApi } from '@/lib/api'
 import Table, { Pagination, type ColumnDef } from '@/components/ui/Table'
@@ -279,20 +280,26 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {filtered.length} user{filtered.length !== 1 ? 's' : ''} found
-          </p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500 p-5 shadow-md">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
+        <UsersIcon className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-white">User Management</h1>
+            <p className="text-sm text-emerald-200 mt-0.5">
+              {filtered.length} user{filtered.length !== 1 ? 's' : ''} in your school
+            </p>
+          </div>
+          <button
+            onClick={() => { setAddModalOpen(true); setFormError(null) }}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-emerald-700 bg-white rounded-lg hover:bg-emerald-50 transition-colors shadow-sm self-start sm:self-auto"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            Add User
+          </button>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => { setAddModalOpen(true); setFormError(null) }}
-        >
-          <UserPlus className="h-4 w-4 mr-2" aria-hidden="true" />
-          Add User
-        </Button>
       </div>
 
       {/* Filters */}
