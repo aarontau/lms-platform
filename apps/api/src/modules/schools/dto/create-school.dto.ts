@@ -9,6 +9,9 @@ import {
   MinLength,
 } from 'class-validator'
 
+// districtId and circuitId are required by the DB schema (non-nullable).
+// They are separate foreign keys — a district is not interchangeable with a province.
+
 export enum SchoolType {
   PUBLIC = 'PUBLIC',
   INDEPENDENT = 'INDEPENDENT',
@@ -32,21 +35,19 @@ export class CreateSchoolDto {
   @IsUUID('4', { message: 'provinceId must be a valid UUID' })
   provinceId: string
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '123e4567-e89b-12d3-a456-426614174001',
     description: 'District ID (UUID)',
   })
-  @IsOptional()
   @IsUUID('4', { message: 'districtId must be a valid UUID' })
-  districtId?: string
+  districtId: string
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '123e4567-e89b-12d3-a456-426614174002',
     description: 'Circuit ID (UUID)',
   })
-  @IsOptional()
   @IsUUID('4', { message: 'circuitId must be a valid UUID' })
-  circuitId?: string
+  circuitId: string
 
   @ApiProperty({
     enum: SchoolType,

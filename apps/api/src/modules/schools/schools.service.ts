@@ -2,8 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { CreateSchoolDto } from './dto/create-school.dto'
 import { UpdateSchoolDto } from './dto/update-school.dto'
@@ -50,227 +50,192 @@ function getSaTermDates(year: number): Array<{
 export class SchoolsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ── Public methods ───────────────────────────────────────────────────────────
+
   async create(dto: CreateSchoolDto) {
-    try {
-      const existingEmis = await this.prisma.school.findUnique({
-        where: { emisNumber: dto.emisNumber },
-      })
-      if (existingEmis) {
-        throw new ConflictException(`A school with EMIS number ${dto.emisNumber} already exists`)
-      }
+    await this.assertEmisAvailable(dto.emisNumber)
+    await this.assertSubdomainAvailable(dto.subdomain)
 
-      const existingSubdomain = await this.prisma.school.findUnique({
-        where: { subdomain: dto.subdomain },
-      })
-      if (existingSubdomain) {
-        throw new ConflictException(`Subdomain '${dto.subdomain}' is already in use`)
-      }
-
-      const school = await this.prisma.school.create({
-        data: {
-          name: dto.name,
-          emisNumber: dto.emisNumber,
-          provinceId: dto.provinceId,
-          districtId: dto.districtId || dto.provinceId,
-          circuitId: dto.circuitId || dto.provinceId,
-          schoolType: dto.schoolType as any,
-          phone: dto.phone,
-          email: dto.email,
-          address: dto.address,
-          subdomain: dto.subdomain,
-        },
-      })
-
-      return school
-    } catch (error) {
-      if (error instanceof ConflictException) {
-        throw error
-      }
-      throw new BadRequestException('Failed to create school. Please verify all provided IDs are valid.')
-    }
+    return this.prisma.school.create({
+      data: {
+        name: dto.name,
+        emisNumber: dto.emisNumber,
+        provinceId: dto.provinceId,
+        districtId: dto.districtId,
+        circuitId: dto.circuitId,
+        schoolType: dto.schoolType as any,
+        phone: dto.phone,
+        email: dto.email,
+        address: dto.address,
+        subdomain: dto.subdomain,
+      },
+    })
   }
 
   async findAll() {
-    try {
-      const schools = await this.prisma.school.findMany({
-        include: {
-          province: { select: { id: true, name: true, code: true } },
-          district: { select: { id: true, name: true } },
-          circuit: { select: { id: true, name: true } },
-        },
-        orderBy: { name: 'asc' },
-      })
-
-      return schools
-    } catch (error) {
-      throw new BadRequestException('Failed to retrieve schools')
-    }
+    return this.prisma.school.findMany({
+      include: {
+        province: { select: { id: true, name: true, code: true } },
+        district: { select: { id: true, name: true } },
+        circuit: { select: { id: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
+    })
   }
 
   async findOne(id: string) {
-    try {
-      const school = await this.prisma.school.findUnique({
-        where: { id },
-        include: {
-          province: { select: { id: true, name: true, code: true } },
-          district: { select: { id: true, name: true } },
-          circuit: { select: { id: true, name: true } },
-          academicYears: {
-            orderBy: { year: 'desc' },
-            take: 5,
-            select: { id: true, year: true, isCurrent: true, startDate: true, endDate: true },
-          },
+    const school = await this.prisma.school.findUnique({
+      where: { id },
+      include: {
+        province: { select: { id: true, name: true, code: true } },
+        district: { select: { id: true, name: true } },
+        circuit: { select: { id: true, name: true } },
+        academicYears: {
+          orderBy: { year: 'desc' },
+          take: 5,
+          select: { id: true, year: true, isCurrent: true, startDate: true, endDate: true },
         },
-      })
+      },
+    })
 
-      if (!school) {
-        throw new NotFoundException(`School with ID ${id} not found`)
-      }
-
-      return school
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error
-      }
-      throw new BadRequestException(`Failed to retrieve school with ID ${id}`)
-    }
-  }
-
-  async update(id: string, dto: UpdateSchoolDto) {
-    try {
-      await this.findOne(id)
-
-      if (dto.subdomain) {
-        const existing = await this.prisma.school.findFirst({
-          where: { subdomain: dto.subdomain, id: { not: id } },
-        })
-        if (existing) {
-          throw new ConflictException(`Subdomain '${dto.subdomain}' is already in use`)
-        }
-      }
-
-      if (dto.emisNumber) {
-        const existing = await this.prisma.school.findFirst({
-          where: { emisNumber: dto.emisNumber, id: { not: id } },
-        })
-        if (existing) {
-          throw new ConflictException(`EMIS number ${dto.emisNumber} is already in use`)
-        }
-      }
-
-      const updateData: any = {}
-      if (dto.name !== undefined) updateData.name = dto.name
-      if (dto.emisNumber !== undefined) updateData.emisNumber = dto.emisNumber
-      if (dto.provinceId !== undefined) updateData.provinceId = dto.provinceId
-      if (dto.districtId !== undefined) updateData.districtId = dto.districtId
-      if (dto.circuitId !== undefined) updateData.circuitId = dto.circuitId
-      if (dto.schoolType !== undefined) updateData.schoolType = dto.schoolType
-      if (dto.phone !== undefined) updateData.phone = dto.phone
-      if (dto.email !== undefined) updateData.email = dto.email
-      if (dto.address !== undefined) updateData.address = dto.address
-      if (dto.subdomain !== undefined) updateData.subdomain = dto.subdomain
-
-      const school = await this.prisma.school.update({
-        where: { id },
-        data: updateData,
-      })
-
-      return school
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ConflictException) {
-        throw error
-      }
-      throw new BadRequestException('Failed to update school')
-    }
+    if (!school) throw new NotFoundException(`School with ID ${id} not found`)
+    return school
   }
 
   async findBySubdomain(subdomain: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { subdomain },
+      select: {
+        id: true,
+        name: true,
+        emisNumber: true,
+        subdomain: true,
+        status: true,
+        logoUrl: true,
+      },
+    })
+
+    if (!school) throw new NotFoundException(`No school found for subdomain '${subdomain}'`)
+    return school
+  }
+
+  async update(id: string, dto: UpdateSchoolDto) {
+    if (dto.subdomain) await this.assertSubdomainAvailable(dto.subdomain, id)
+    if (dto.emisNumber) await this.assertEmisAvailable(dto.emisNumber, id)
+
     try {
-      const school = await this.prisma.school.findUnique({
-        where: { subdomain },
-        select: {
-          id: true,
-          name: true,
-          emisNumber: true,
-          subdomain: true,
-          status: true,
-          logoUrl: true,
+      return await this.prisma.school.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name }),
+          ...(dto.emisNumber !== undefined && { emisNumber: dto.emisNumber }),
+          ...(dto.provinceId !== undefined && { provinceId: dto.provinceId }),
+          ...(dto.districtId !== undefined && { districtId: dto.districtId }),
+          ...(dto.circuitId !== undefined && { circuitId: dto.circuitId }),
+          ...(dto.schoolType !== undefined && { schoolType: dto.schoolType as any }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+          ...(dto.email !== undefined && { email: dto.email }),
+          ...(dto.address !== undefined && { address: dto.address }),
+          ...(dto.subdomain !== undefined && { subdomain: dto.subdomain }),
         },
       })
-
-      if (!school) {
-        throw new NotFoundException(`No school found for subdomain '${subdomain}'`)
-      }
-
-      return school
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`School with ID ${id} not found`)
       }
-      throw new BadRequestException(`Failed to look up school by subdomain '${subdomain}'`)
+      throw error
     }
   }
 
   async setupAcademicYear(schoolId: string, year: number) {
-    try {
-      await this.findOne(schoolId)
+    // Verify the school exists before doing anything else.
+    await this.findOne(schoolId)
 
-      const existing = await this.prisma.academicYear.findUnique({
-        where: { schoolId_year: { schoolId, year } },
-      })
-      if (existing) {
-        throw new ConflictException(`Academic year ${year} already exists for this school`)
-      }
+    const existing = await this.prisma.academicYear.findUnique({
+      where: { schoolId_year: { schoolId, year } },
+    })
+    if (existing) {
+      throw new ConflictException(`Academic year ${year} already exists for this school`)
+    }
 
-      const termDates = getSaTermDates(year)
-      const yearStart = termDates[0].startDate
-      const yearEnd = termDates[termDates.length - 1].endDate
+    const termDates = getSaTermDates(year)
+    const yearStart = termDates[0].startDate
+    const yearEnd = termDates[termDates.length - 1].endDate
+    const currentDate = new Date()
 
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Set all existing academic years to not current
-        await tx.academicYear.updateMany({
-          where: { schoolId },
-          data: { isCurrent: false },
-        })
-
-        const academicYear = await tx.academicYear.create({
-          data: {
-            schoolId,
-            year,
-            isCurrent: true,
-            startDate: yearStart,
-            endDate: yearEnd,
-          },
-        })
-
-        const currentDate = new Date()
-
-        const terms = await Promise.all(
-          termDates.map((term) =>
-            tx.term.create({
-              data: {
-                schoolId,
-                academicYearId: academicYear.id,
-                termNumber: term.termNumber,
-                name: term.name,
-                startDate: term.startDate,
-                endDate: term.endDate,
-                isActive:
-                  currentDate >= term.startDate && currentDate <= term.endDate,
-              },
-            }),
-          ),
-        )
-
-        return { academicYear, terms }
+    return this.prisma.$transaction(async (tx) => {
+      // Unset the current flag on all existing academic years for this school.
+      await tx.academicYear.updateMany({
+        where: { schoolId },
+        data: { isCurrent: false },
       })
 
-      return result
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ConflictException) {
-        throw error
-      }
-      throw new BadRequestException(`Failed to set up academic year ${year}`)
+      const academicYear = await tx.academicYear.create({
+        data: {
+          schoolId,
+          year,
+          isCurrent: true,
+          startDate: yearStart,
+          endDate: yearEnd,
+        },
+      })
+
+      const terms = await Promise.all(
+        termDates.map((term) =>
+          tx.term.create({
+            data: {
+              schoolId,
+              academicYearId: academicYear.id,
+              termNumber: term.termNumber,
+              name: term.name,
+              startDate: term.startDate,
+              endDate: term.endDate,
+              isActive: currentDate >= term.startDate && currentDate <= term.endDate,
+            },
+          }),
+        ),
+      )
+
+      return { academicYear, terms }
+    })
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Throws ConflictException if the EMIS number is already taken by another school.
+   * Pass excludeId to ignore the current record during updates.
+   */
+  private async assertEmisAvailable(emisNumber: string, excludeId?: string) {
+    const existing = await this.prisma.school.findFirst({
+      where: {
+        emisNumber,
+        ...(excludeId && { id: { not: excludeId } }),
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      throw new ConflictException(`EMIS number ${emisNumber} is already in use`)
+    }
+  }
+
+  /**
+   * Throws ConflictException if the subdomain is already taken by another school.
+   * Pass excludeId to ignore the current record during updates.
+   */
+  private async assertSubdomainAvailable(subdomain: string, excludeId?: string) {
+    const existing = await this.prisma.school.findFirst({
+      where: {
+        subdomain,
+        ...(excludeId && { id: { not: excludeId } }),
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      throw new ConflictException(`Subdomain '${subdomain}' is already in use`)
     }
   }
 }
