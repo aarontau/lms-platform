@@ -5,7 +5,6 @@ import {
   Put,
   Body,
   Param,
-  UseGuards,
   Request,
   HttpCode,
   HttpStatus,
@@ -22,13 +21,10 @@ import { SchoolsService } from './schools.service'
 import { CreateSchoolDto } from './dto/create-school.dto'
 import { UpdateSchoolDto } from './dto/update-school.dto'
 import { SetupAcademicYearDto } from './dto/setup-academic-year.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Schools')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('schools')
 export class SchoolsController {
   constructor(private readonly schoolsService: SchoolsService) {}

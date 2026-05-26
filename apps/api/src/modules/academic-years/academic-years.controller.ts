@@ -6,7 +6,6 @@ import {
   Patch,
   Body,
   Param,
-  UseGuards,
   Request,
   HttpCode,
   HttpStatus,
@@ -22,13 +21,10 @@ import {
 import { AcademicYearsService } from './academic-years.service'
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto'
 import { UpdateAcademicYearDto } from './dto/update-academic-year.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Academic Years')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('academic-years')
 export class AcademicYearsController {
   constructor(private readonly academicYearsService: AcademicYearsService) {}

@@ -7,7 +7,6 @@ import {
   Patch,
   Body,
   Param,
-  UseGuards,
   Request,
   HttpCode,
   HttpStatus,
@@ -24,13 +23,10 @@ import { UsersService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { ChangeRoleDto } from './dto/change-role.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

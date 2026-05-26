@@ -14,6 +14,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module'
 import { AssessmentModule } from './modules/assessment/assessment.module'
 import { TenantMiddleware } from './common/middleware/tenant.middleware'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
+import { RolesGuard } from './common/guards/roles.guard'
 
 @Module({
   imports: [
@@ -34,11 +35,16 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
     AssessmentModule,
   ],
   providers: [
-    // Every route requires a valid JWT by default.
-    // Opt out on individual routes or controllers with @Public().
+    // Guards run in registration order.
+    // 1. JwtAuthGuard — every route requires a valid JWT; opt out with @Public().
+    // 2. RolesGuard   — if @Roles(...) is present, the user's role must match.
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

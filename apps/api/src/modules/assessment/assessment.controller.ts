@@ -22,20 +22,17 @@
 
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, ParseUUIDPipe, UseGuards,
+  Body, Param, Query, ParseUUIDPipe,
   HttpCode, HttpStatus,
 } from '@nestjs/common'
 import { AssessmentService } from './assessment.service'
 import { CreatePoaDto, PoaStatus } from './dto/create-poa.dto'
 import { CreateTaskDto, UpdateTaskDto } from './dto/create-task.dto'
 import { CaptureMarksDto } from './dto/capture-marks.dto'
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
 @Controller('assessment')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class AssessmentController {
   constructor(private readonly svc: AssessmentService) {}
 

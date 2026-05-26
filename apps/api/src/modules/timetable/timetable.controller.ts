@@ -1,19 +1,16 @@
 import {
   Controller, Get, Post, Put, Delete,
   Body, Param, Query, Request,
-  UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
+  HttpCode, HttpStatus, ParseUUIDPipe,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { TimetableService } from './timetable.service'
 import { CreatePeriodDto } from './dto/create-period.dto'
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Timetable')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('timetable')
 export class TimetableController {
   constructor(private readonly timetableService: TimetableService) {}

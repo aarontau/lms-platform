@@ -1,19 +1,16 @@
 import {
   Controller, Get, Post,
   Body, Param, Query, Request,
-  UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
+  HttpCode, HttpStatus, ParseUUIDPipe,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { AttendanceService } from './attendance.service'
 import { CreateAttendanceRegisterDto } from './dto/create-attendance-register.dto'
 import { MarkAttendanceDto } from './dto/mark-attendance.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}

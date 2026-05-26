@@ -1,10 +1,8 @@
 import {
   Controller, Get, Post, Put, Delete, Body, Param, Query,
-  UseGuards, Request, HttpCode, HttpStatus, ParseUUIDPipe,
+  Request, HttpCode, HttpStatus, ParseUUIDPipe,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
-import { JwtGuard } from '../../common/guards/jwt.guard'
-import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
 import { LearnersService } from './learners.service'
 import { CreateLearnerDto } from './dto/create-learner.dto'
@@ -15,7 +13,6 @@ import { LearnerFiltersDto } from './dto/learner-filters.dto'
 
 @ApiTags('Learners')
 @ApiBearerAuth()
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('learners')
 export class LearnersController {
   constructor(private readonly learnersService: LearnersService) {}
