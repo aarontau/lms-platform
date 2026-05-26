@@ -1,0 +1,1226 @@
+// =============================================================================
+// Prisma Schema — South African Multi-School Learner Management System
+// Target DB  : PostgreSQL (Row-Level Security via school_id)
+// Generated  : 2026-05-25
+// =============================================================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum CurriculumType {
+  CAPS
+  IEB
+}
+
+enum SchoolType {
+  PUBLIC
+  INDEPENDENT
+  IEB_SCHOOL
+  COMBINED
+}
+
+enum SchoolStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  PRINCIPAL
+  HOD
+  TEACHER
+  PARENT
+  LEARNER
+}
+
+enum IdType {
+  SA_ID
+  PASSPORT
+  BIRTH_CERTIFICATE
+  OTHER
+}
+
+enum GuardianRelationship {
+  MOTHER
+  FATHER
+  GUARDIAN
+  GRANDPARENT
+  SIBLING
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum LearnerStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED_OUT
+  GRADUATED
+  SUSPENDED
+}
+
+enum EnrolmentStatus {
+  ACTIVE
+  TRANSFERRED_OUT
+  WITHDRAWN
+  COMPLETED
+}
+
+enum VenueType {
+  CLASSROOM
+  LABORATORY
+  HALL
+  SPORTS_FIELD
+  COMPUTER_LAB
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED_ABSENT
+}
+
+enum PoaStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+enum TaskType {
+  DIAGNOSTIC
+  CLASS_TEST
+  ASSIGNMENT
+  HOMEWORK
+  ORAL
+  PRACTICAL
+  SUMMATIVE_EXAM
+}
+
+enum TaskStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  MODERATED
+}
+
+enum LearningStyle {
+  VISUAL
+  AUDITORY
+  KINESTHETIC
+  READING_WRITING
+  MIXED
+}
+
+enum ReportType {
+  TERM_PROGRESS
+  ANNUAL
+}
+
+enum ReportStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum PromotionRecommendation {
+  PROMOTE
+  REPEAT
+  PROGRESS
+}
+
+enum NotificationType {
+  ABSENCE_ALERT
+  REPORT_CARD_READY
+  MARK_PUBLISHED
+  INVOICE_ISSUED
+  GENERAL
+  SYSTEM
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum LuritsExportType {
+  LEARNER_DATA
+  ATTENDANCE
+  MARKS
+  EMIS_ANNUAL
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum FeeType {
+  TUITION
+  REGISTRATION
+  ACTIVITY
+  SPORT
+  OTHER
+}
+
+enum BillingFrequency {
+  ANNUAL
+  TERMLY
+  MONTHLY
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  EFT
+  CARD
+  DEBIT_ORDER
+  BURSARY
+}
+
+// =============================================================================
+// GLOBAL MODELS (no school_id — shared across all tenants)
+// =============================================================================
+
+model Province {
+  id   String @id @default(uuid())
+  name String
+  code String @unique
+
+  districts District[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("provinces")
+}
+
+model District {
+  id         String @id @default(uuid())
+  provinceId String @map("province_id")
+  name       String
+  code       String
+
+  province Province  @relation(fields: [provinceId], references: [id])
+  circuits Circuit[]
+  schools  School[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([provinceId])
+  @@map("districts")
+}
+
+model Circuit {
+  id         String @id @default(uuid())
+  districtId String @map("district_id")
+  name       String
+
+  district District @relation(fields: [districtId], references: [id])
+  schools  School[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([districtId])
+  @@map("circuits")
+}
+
+model CapsPhase {
+  id         String  @id @default(uuid())
+  name       String
+  gradeFrom  Int     @map("grade_from")
+  gradeTo    Int     @map("grade_to")
+  sbaWeight  Decimal @map("sba_weight")
+  examWeight Decimal @map("exam_weight")
+
+  capsSubjects CapsSubject[]
+  grades       Grade[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("caps_phases")
+}
+
+model CapsSubject {
+  id             String         @id @default(uuid())
+  capsPhaseId    String         @map("caps_phase_id")
+  name           String
+  code           String
+  isCompulsory   Boolean        @map("is_compulsory")
+  subjectGroup   String         @map("subject_group")
+  curriculumType CurriculumType @map("curriculum_type")
+  isActive       Boolean        @default(true) @map("is_active")
+
+  capsPhase      CapsPhase      @relation(fields: [capsPhaseId], references: [id])
+  schoolSubjects SchoolSubject[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([capsPhaseId])
+  @@map("caps_subjects")
+}
+
+// =============================================================================
+// TENANT MODELS (all have schoolId)
+// =============================================================================
+
+model School {
+  id          String       @id @default(uuid())
+  name        String
+  emisNumber  String       @unique @map("emis_number")
+  provinceId  String       @map("province_id")
+  districtId  String       @map("district_id")
+  circuitId   String       @map("circuit_id")
+  schoolType  SchoolType   @map("school_type")
+  phone       String?
+  email       String?
+  address     String?
+  logoUrl     String?      @map("logo_url")
+  subdomain   String       @unique
+  status      SchoolStatus @default(TRIAL)
+
+  province Province @relation(fields: [provinceId], references: [id])
+  district District @relation(fields: [districtId], references: [id])
+  circuit  Circuit  @relation(fields: [circuitId], references: [id])
+
+  academicYears            AcademicYear[]
+  terms                    Term[]
+  grades                   Grade[]
+  users                    User[]
+  guardians                Guardian[]
+  learners                 Learner[]
+  learnerGuardians         LearnerGuardian[]
+  learnerEnrolments        LearnerEnrolment[]
+  schoolSubjects           SchoolSubject[]
+  classes                  Class[]
+  subjectClasses           SubjectClass[]
+  venues                   Venue[]
+  periods                  Period[]
+  timetableSlots           TimetableSlot[]
+  attendanceRegisters      AttendanceRegister[]
+  attendanceRecords        AttendanceRecord[]
+  programmesOfAssessment   ProgrammeOfAssessment[]
+  assessmentTasks          AssessmentTask[]
+  learnerMarks             LearnerMark[]
+  diagnosticAssessments    DiagnosticAssessment[]
+  learningProfiles         LearningProfile[]
+  termSbaResults           TermSbaResult[]
+  annualSubjectResults     AnnualSubjectResult[]
+  reportCards              ReportCard[]
+  promotionDecisions       PromotionDecision[]
+  notifications            Notification[]
+  luritsExportBatches      LuritsExportBatch[]
+  feeStructures            FeeStructure[]
+  invoices                 Invoice[]
+  payments                 Payment[]
+  auditLogs                AuditLog[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([provinceId])
+  @@index([districtId])
+  @@index([circuitId])
+  @@map("schools")
+}
+
+model AcademicYear {
+  id        String  @id @default(uuid())
+  schoolId  String  @map("school_id")
+  year      Int
+  isCurrent Boolean @default(false) @map("is_current")
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  terms                  Term[]
+  grades                 Grade[]
+  classes                Class[]
+  subjectClasses         SubjectClass[]
+  periods                Period[]
+  timetableSlots         TimetableSlot[]
+  attendanceRegisters    AttendanceRegister[]
+  learnerEnrolments      LearnerEnrolment[]
+  diagnosticAssessments  DiagnosticAssessment[]
+  learningProfiles       LearningProfile[]
+  termSbaResults         TermSbaResult[]
+  annualSubjectResults   AnnualSubjectResult[]
+  reportCards            ReportCard[]
+  promotionDecisions     PromotionDecision[]
+  luritsExportBatches    LuritsExportBatch[]
+  feeStructures          FeeStructure[]
+  invoices               Invoice[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, year])
+  @@index([schoolId])
+  @@map("academic_years")
+}
+
+model Term {
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  academicYearId String   @map("academic_year_id")
+  termNumber     Int      @map("term_number")
+  name           String
+  startDate      DateTime @map("start_date")
+  endDate        DateTime @map("end_date")
+  isActive       Boolean  @map("is_active")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  attendanceRegisters    AttendanceRegister[]
+  programmesOfAssessment ProgrammeOfAssessment[]
+  assessmentTasks        AssessmentTask[]
+  termSbaResults         TermSbaResult[]
+  reportCards            ReportCard[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, academicYearId, termNumber])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@map("terms")
+}
+
+model Grade {
+  id           String @id @default(uuid())
+  schoolId     String @map("school_id")
+  gradeNumber  Int    @map("grade_number")
+  capsPhaseId  String @map("caps_phase_id")
+  academicYearId String @map("academic_year_id")
+  name         String
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  capsPhase    CapsPhase    @relation(fields: [capsPhaseId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  classes       Class[]
+  feeStructures FeeStructure[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, gradeNumber, academicYearId])
+  @@index([schoolId])
+  @@index([capsPhaseId])
+  @@index([academicYearId])
+  @@map("grades")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  schoolId      String?  @map("school_id")
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  phone         String?
+  role          UserRole
+  isActive      Boolean  @default(true) @map("is_active")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  school School? @relation(fields: [schoolId], references: [id])
+
+  guardians               Guardian[]
+  learners                Learner[]
+  classesAsTeacher        Class[]                  @relation("ClassTeacher")
+  subjectClassesAsteacher SubjectClass[]
+  attendanceRegisters     AttendanceRegister[]
+  marksCapturing          LearnerMark[]            @relation("CapturedBy")
+  marksModeration         LearnerMark[]            @relation("ModeratedBy")
+  programmesCreated       ProgrammeOfAssessment[]  @relation("PoaCreatedBy")
+  programmesApproved      ProgrammeOfAssessment[]  @relation("PoaApprovedBy")
+  assessmentTasksCreated  AssessmentTask[]
+  diagnosticAssessments   DiagnosticAssessment[]
+  learningProfiles        LearningProfile[]
+  reportCardsPublished    ReportCard[]
+  promotionDecisions      PromotionDecision[]
+  notifications           Notification[]
+  luritsExports           LuritsExportBatch[]
+  paymentsRecorded        Payment[]
+  auditLogs               AuditLog[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([schoolId])
+  @@index([role])
+  @@map("users")
+}
+
+model Guardian {
+  id               String               @id @default(uuid())
+  schoolId         String               @map("school_id")
+  userId           String?              @map("user_id")
+  firstName        String               @map("first_name")
+  lastName         String               @map("last_name")
+  idNumber         String?              @map("id_number")
+  idType           IdType?              @map("id_type")
+  phonePrimary     String               @map("phone_primary")
+  phoneSecondary   String?              @map("phone_secondary")
+  email            String?
+  relationship     GuardianRelationship
+  isPrimaryContact Boolean              @default(false) @map("is_primary_contact")
+  canCollect       Boolean              @default(true) @map("can_collect")
+
+  school          School            @relation(fields: [schoolId], references: [id])
+  user            User?             @relation(fields: [userId], references: [id])
+  learnerGuardians LearnerGuardian[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([userId])
+  @@map("guardians")
+}
+
+model Learner {
+  id               String        @id @default(uuid())
+  schoolId         String        @map("school_id")
+  userId           String?       @map("user_id")
+  studentNumber    String        @map("student_number")
+  luritsNumber     String?       @map("lurits_number")
+  firstName        String        @map("first_name")
+  middleName       String?       @map("middle_name")
+  lastName         String        @map("last_name")
+  dateOfBirth      DateTime      @map("date_of_birth")
+  gender           Gender
+  nationality      String        @default("South African")
+  homeLanguage     String        @map("home_language")
+  idNumber         String?       @map("id_number")
+  idType           IdType?       @map("id_type")
+  admissionDate    DateTime      @map("admission_date")
+  admissionNumber  String?       @map("admission_number")
+  previousSchool   String?       @map("previous_school")
+  status           LearnerStatus @default(ACTIVE)
+  hasSpecialNeeds  Boolean       @default(false) @map("has_special_needs")
+  medicalNotes     String?       @map("medical_notes")
+  photoUrl         String?       @map("photo_url")
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  learnerGuardians      LearnerGuardian[]
+  learnerEnrolments     LearnerEnrolment[]
+  attendanceRecords     AttendanceRecord[]
+  learnerMarks          LearnerMark[]
+  diagnosticAssessments DiagnosticAssessment[]
+  learningProfiles      LearningProfile[]
+  termSbaResults        TermSbaResult[]
+  annualSubjectResults  AnnualSubjectResult[]
+  reportCards           ReportCard[]
+  promotionDecisions    PromotionDecision[]
+  invoices              Invoice[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([schoolId, studentNumber])
+  @@index([schoolId])
+  @@index([schoolId, userId])
+  @@index([status])
+  @@map("learners")
+}
+
+model LearnerGuardian {
+  id          String  @id @default(uuid())
+  schoolId    String  @map("school_id")
+  learnerId   String  @map("learner_id")
+  guardianId  String  @map("guardian_id")
+  isPrimary   Boolean @default(false) @map("is_primary")
+
+  school   School   @relation(fields: [schoolId], references: [id])
+  learner  Learner  @relation(fields: [learnerId], references: [id])
+  guardian Guardian @relation(fields: [guardianId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([learnerId, guardianId])
+  @@index([schoolId])
+  @@index([learnerId])
+  @@index([guardianId])
+  @@map("learner_guardians")
+}
+
+model LearnerEnrolment {
+  id             String          @id @default(uuid())
+  schoolId       String          @map("school_id")
+  learnerId      String          @map("learner_id")
+  academicYearId String          @map("academic_year_id")
+  gradeId        String          @map("grade_id")
+  classId        String          @map("class_id")
+  enrolmentDate  DateTime        @map("enrolment_date")
+  status         EnrolmentStatus @default(ACTIVE)
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  grade        Grade        @relation(fields: [gradeId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@index([gradeId])
+  @@index([classId])
+  @@map("learner_enrolments")
+}
+
+model SchoolSubject {
+  id            String  @id @default(uuid())
+  schoolId      String  @map("school_id")
+  capsSubjectId String  @map("caps_subject_id")
+  name          String
+  code          String
+  isActive      Boolean @default(true) @map("is_active")
+
+  school      School      @relation(fields: [schoolId], references: [id])
+  capsSubject CapsSubject @relation(fields: [capsSubjectId], references: [id])
+
+  subjectClasses SubjectClass[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([capsSubjectId])
+  @@map("school_subjects")
+}
+
+model Class {
+  id             String  @id @default(uuid())
+  schoolId       String  @map("school_id")
+  gradeId        String  @map("grade_id")
+  academicYearId String  @map("academic_year_id")
+  name           String
+  classTeacherId String? @map("class_teacher_id")
+  maxCapacity    Int     @default(35) @map("max_capacity")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  grade        Grade        @relation(fields: [gradeId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  classTeacher User?        @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+
+  subjectClasses      SubjectClass[]
+  learnerEnrolments   LearnerEnrolment[]
+  attendanceRegisters AttendanceRegister[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([schoolId, gradeId, academicYearId, name])
+  @@index([schoolId])
+  @@index([gradeId])
+  @@index([academicYearId])
+  @@index([classTeacherId])
+  @@map("classes")
+}
+
+model SubjectClass {
+  id             String @id @default(uuid())
+  schoolId       String @map("school_id")
+  schoolSubjectId String @map("school_subject_id")
+  classId        String @map("class_id")
+  teacherId      String @map("teacher_id")
+  academicYearId String @map("academic_year_id")
+
+  school        School        @relation(fields: [schoolId], references: [id])
+  schoolSubject SchoolSubject @relation(fields: [schoolSubjectId], references: [id])
+  class         Class         @relation(fields: [classId], references: [id])
+  teacher       User          @relation(fields: [teacherId], references: [id])
+  academicYear  AcademicYear  @relation(fields: [academicYearId], references: [id])
+
+  timetableSlots         TimetableSlot[]
+  programmesOfAssessment ProgrammeOfAssessment[]
+  assessmentTasks        AssessmentTask[]
+  diagnosticAssessments  DiagnosticAssessment[]
+  termSbaResults         TermSbaResult[]
+  annualSubjectResults   AnnualSubjectResult[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, schoolSubjectId, classId, academicYearId])
+  @@index([schoolId])
+  @@index([schoolSubjectId])
+  @@index([classId])
+  @@index([teacherId])
+  @@index([academicYearId])
+  @@map("subject_classes")
+}
+
+model Venue {
+  id        String    @id @default(uuid())
+  schoolId  String    @map("school_id")
+  name      String
+  capacity  Int
+  venueType VenueType @map("venue_type")
+  isActive  Boolean   @default(true) @map("is_active")
+
+  school         School          @relation(fields: [schoolId], references: [id])
+  timetableSlots TimetableSlot[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@map("venues")
+}
+
+model Period {
+  id             String  @id @default(uuid())
+  schoolId       String  @map("school_id")
+  academicYearId String  @map("academic_year_id")
+  name           String
+  periodNumber   Int     @map("period_number")
+  startTime      String  @map("start_time")
+  endTime        String  @map("end_time")
+  dayOfWeek      Int     @map("day_of_week")
+  isLesson       Boolean @default(true) @map("is_lesson")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  timetableSlots TimetableSlot[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@map("periods")
+}
+
+model TimetableSlot {
+  id             String @id @default(uuid())
+  schoolId       String @map("school_id")
+  periodId       String @map("period_id")
+  subjectClassId String @map("subject_class_id")
+  venueId        String @map("venue_id")
+  academicYearId String @map("academic_year_id")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  period       Period       @relation(fields: [periodId], references: [id])
+  subjectClass SubjectClass @relation(fields: [subjectClassId], references: [id])
+  venue        Venue        @relation(fields: [venueId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, periodId, subjectClassId, academicYearId])
+  @@index([schoolId])
+  @@index([periodId])
+  @@index([subjectClassId])
+  @@index([venueId])
+  @@index([academicYearId])
+  @@map("timetable_slots")
+}
+
+model AttendanceRegister {
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  classId        String   @map("class_id")
+  date           DateTime
+  teacherId      String   @map("teacher_id")
+  academicYearId String   @map("academic_year_id")
+  termId         String   @map("term_id")
+  capturedAt     DateTime @default(now()) @map("captured_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  teacher      User         @relation(fields: [teacherId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  term         Term         @relation(fields: [termId], references: [id])
+
+  attendanceRecords AttendanceRecord[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([schoolId, classId, date])
+  @@index([schoolId])
+  @@index([classId])
+  @@index([teacherId])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("attendance_registers")
+}
+
+model AttendanceRecord {
+  id                   String           @id @default(uuid())
+  schoolId             String           @map("school_id")
+  attendanceRegisterId String           @map("attendance_register_id")
+  learnerId            String           @map("learner_id")
+  status               AttendanceStatus
+  notes                String?
+
+  school             School             @relation(fields: [schoolId], references: [id])
+  attendanceRegister AttendanceRegister @relation(fields: [attendanceRegisterId], references: [id])
+  learner            Learner            @relation(fields: [learnerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([attendanceRegisterId, learnerId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([attendanceRegisterId])
+  @@index([learnerId])
+  @@map("attendance_records")
+}
+
+model ProgrammeOfAssessment {
+  id                    String    @id @default(uuid())
+  schoolId              String    @map("school_id")
+  subjectClassId        String    @map("subject_class_id")
+  termId                String    @map("term_id")
+  totalTasksRequired    Int       @map("total_tasks_required")
+  createdById           String    @map("created_by_id")
+  approvedById          String?   @map("approved_by_id")
+  status                PoaStatus @default(DRAFT)
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  subjectClass SubjectClass @relation(fields: [subjectClassId], references: [id])
+  term         Term         @relation(fields: [termId], references: [id])
+  createdBy    User         @relation("PoaCreatedBy", fields: [createdById], references: [id])
+  approvedBy   User?        @relation("PoaApprovedBy", fields: [approvedById], references: [id])
+
+  assessmentTasks AssessmentTask[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([schoolId, subjectClassId, termId])
+  @@index([schoolId])
+  @@index([subjectClassId])
+  @@index([termId])
+  @@index([createdById])
+  @@map("programmes_of_assessment")
+}
+
+model AssessmentTask {
+  id                      String     @id @default(uuid())
+  schoolId                String     @map("school_id")
+  programmeOfAssessmentId String     @map("programme_of_assessment_id")
+  subjectClassId          String     @map("subject_class_id")
+  termId                  String     @map("term_id")
+  title                   String
+  taskType                TaskType   @map("task_type")
+  maxMark                 Decimal    @map("max_mark")
+  weightInSba             Decimal    @map("weight_in_sba")
+  dueDate                 DateTime?  @map("due_date")
+  administeredDate        DateTime?  @map("administered_date")
+  isExam                  Boolean    @default(false) @map("is_exam")
+  status                  TaskStatus @default(DRAFT)
+  createdById             String     @map("created_by_id")
+
+  school                School                @relation(fields: [schoolId], references: [id])
+  programmeOfAssessment ProgrammeOfAssessment @relation(fields: [programmeOfAssessmentId], references: [id])
+  subjectClass          SubjectClass          @relation(fields: [subjectClassId], references: [id])
+  term                  Term                  @relation(fields: [termId], references: [id])
+  createdBy             User                  @relation(fields: [createdById], references: [id])
+
+  learnerMarks LearnerMark[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([programmeOfAssessmentId])
+  @@index([subjectClassId])
+  @@index([termId])
+  @@index([createdById])
+  @@map("assessment_tasks")
+}
+
+model LearnerMark {
+  id               String    @id @default(uuid())
+  schoolId         String    @map("school_id")
+  assessmentTaskId String    @map("assessment_task_id")
+  learnerId        String    @map("learner_id")
+  rawMark          Decimal?  @map("raw_mark")
+  maxMark          Decimal   @map("max_mark")
+  percentage       Decimal?
+  isAbsent         Boolean   @default(false) @map("is_absent")
+  isExempted       Boolean   @default(false) @map("is_exempted")
+  notes            String?
+  capturedById     String    @map("captured_by_id")
+  capturedAt       DateTime  @map("captured_at")
+  moderatedById    String?   @map("moderated_by_id")
+  moderatedAt      DateTime? @map("moderated_at")
+
+  school         School         @relation(fields: [schoolId], references: [id])
+  assessmentTask AssessmentTask @relation(fields: [assessmentTaskId], references: [id])
+  learner        Learner        @relation(fields: [learnerId], references: [id])
+  capturedBy     User           @relation("CapturedBy", fields: [capturedById], references: [id])
+  moderatedBy    User?          @relation("ModeratedBy", fields: [moderatedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([assessmentTaskId, learnerId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([assessmentTaskId])
+  @@index([learnerId])
+  @@index([capturedById])
+  @@map("learner_marks")
+}
+
+model DiagnosticAssessment {
+  id                     String   @id @default(uuid())
+  schoolId               String   @map("school_id")
+  learnerId              String   @map("learner_id")
+  subjectClassId         String   @map("subject_class_id")
+  academicYearId         String   @map("academic_year_id")
+  assessmentDate         DateTime @map("assessment_date")
+  overallLevel           Int      @map("overall_level")
+  areasOfStrength        String?  @map("areas_of_strength")
+  areasForDevelopment    String?  @map("areas_for_development")
+  recommendedSupport     String?  @map("recommended_support")
+  assessedById           String   @map("assessed_by_id")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  subjectClass SubjectClass @relation(fields: [subjectClassId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  assessedBy   User         @relation(fields: [assessedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([subjectClassId])
+  @@index([academicYearId])
+  @@map("diagnostic_assessments")
+}
+
+model LearningProfile {
+  id                   String        @id @default(uuid())
+  schoolId             String        @map("school_id")
+  learnerId            String        @map("learner_id")
+  academicYearId       String        @map("academic_year_id")
+  learningStyle        LearningStyle @map("learning_style")
+  strengths            String?
+  challenges           String?
+  recommendedStrategies String?      @map("recommended_strategies")
+  lsenFlag             Boolean       @default(false) @map("lsen_flag")
+  lsenReferralDate     DateTime?     @map("lsen_referral_date")
+  lsenSupportType      String?       @map("lsen_support_type")
+  createdById          String        @map("created_by_id")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([schoolId, learnerId, academicYearId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@map("learning_profiles")
+}
+
+model TermSbaResult {
+  id                 String  @id @default(uuid())
+  schoolId           String  @map("school_id")
+  learnerId          String  @map("learner_id")
+  subjectClassId     String  @map("subject_class_id")
+  termId             String  @map("term_id")
+  sbaTotalPercentage Decimal @map("sba_total_percentage")
+  tasksCompleted     Int     @map("tasks_completed")
+  tasksTotal         Int     @map("tasks_total")
+  isAtRisk           Boolean @default(false) @map("is_at_risk")
+  calculatedAt       DateTime @default(now()) @map("calculated_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  subjectClass SubjectClass @relation(fields: [subjectClassId], references: [id])
+  term         Term         @relation(fields: [termId], references: [id])
+
+  @@unique([schoolId, learnerId, subjectClassId, termId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([subjectClassId])
+  @@index([termId])
+  @@map("term_sba_results")
+}
+
+model AnnualSubjectResult {
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  learnerId      String   @map("learner_id")
+  subjectClassId String   @map("subject_class_id")
+  academicYearId String   @map("academic_year_id")
+  sbaAverage     Decimal  @map("sba_average")
+  examMark       Decimal? @map("exam_mark")
+  finalMark      Decimal? @map("final_mark")
+  performanceLevel Int?   @map("performance_level")
+  achieved       Boolean  @default(false)
+  calculatedAt   DateTime @default(now()) @map("calculated_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  subjectClass SubjectClass @relation(fields: [subjectClassId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([schoolId, learnerId, subjectClassId, academicYearId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([subjectClassId])
+  @@index([academicYearId])
+  @@map("annual_subject_results")
+}
+
+model ReportCard {
+  id             String       @id @default(uuid())
+  schoolId       String       @map("school_id")
+  learnerId      String       @map("learner_id")
+  academicYearId String       @map("academic_year_id")
+  termId         String?      @map("term_id")
+  reportType     ReportType   @map("report_type")
+  status         ReportStatus @default(DRAFT)
+  pdfUrl         String?      @map("pdf_url")
+  publishedAt    DateTime?    @map("published_at")
+  publishedById  String?      @map("published_by_id")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  term         Term?        @relation(fields: [termId], references: [id])
+  publishedBy  User?        @relation(fields: [publishedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("report_cards")
+}
+
+model PromotionDecision {
+  id             String                  @id @default(uuid())
+  schoolId       String                  @map("school_id")
+  learnerId      String                  @map("learner_id")
+  academicYearId String                  @map("academic_year_id")
+  recommendation PromotionRecommendation
+  finalDecision  PromotionRecommendation @map("final_decision")
+  isOverridden   Boolean                 @default(false) @map("is_overridden")
+  overrideReason String?                 @map("override_reason")
+  decidedById    String?                 @map("decided_by_id")
+  decidedAt      DateTime?               @map("decided_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  decidedBy    User?        @relation(fields: [decidedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([schoolId, learnerId, academicYearId])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@map("promotion_decisions")
+}
+
+model Notification {
+  id               String             @id @default(uuid())
+  schoolId         String             @map("school_id")
+  recipientUserId  String             @map("recipient_user_id")
+  title            String
+  body             String
+  notificationType NotificationType   @map("notification_type")
+  channel          NotificationChannel
+  status           NotificationStatus @default(PENDING)
+  sentAt           DateTime?          @map("sent_at")
+  readAt           DateTime?          @map("read_at")
+
+  school        School @relation(fields: [schoolId], references: [id])
+  recipientUser User   @relation(fields: [recipientUserId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([recipientUserId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model LuritsExportBatch {
+  id             String           @id @default(uuid())
+  schoolId       String           @map("school_id")
+  academicYearId String           @map("academic_year_id")
+  exportType     LuritsExportType @map("export_type")
+  status         ExportStatus     @default(PENDING)
+  recordCount    Int              @default(0) @map("record_count")
+  fileUrl        String?          @map("file_url")
+  validationErrors Json?          @map("validation_errors")
+  exportedById   String           @map("exported_by_id")
+  completedAt    DateTime?        @map("completed_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  exportedBy   User         @relation(fields: [exportedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([exportedById])
+  @@map("lurits_export_batches")
+}
+
+model FeeStructure {
+  id               String           @id @default(uuid())
+  schoolId         String           @map("school_id")
+  academicYearId   String           @map("academic_year_id")
+  name             String
+  amount           Decimal
+  feeType          FeeType          @map("fee_type")
+  gradeId          String?          @map("grade_id")
+  billingFrequency BillingFrequency @map("billing_frequency")
+  isActive         Boolean          @default(true) @map("is_active")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  grade        Grade?       @relation(fields: [gradeId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([gradeId])
+  @@map("fee_structures")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  schoolId       String        @map("school_id")
+  learnerId      String        @map("learner_id")
+  academicYearId String        @map("academic_year_id")
+  invoiceNumber  String        @map("invoice_number")
+  totalAmount    Decimal       @map("total_amount")
+  paidAmount     Decimal       @default(0) @map("paid_amount")
+  status         InvoiceStatus @default(DRAFT)
+  dueDate        DateTime      @map("due_date")
+  issuedAt       DateTime?     @map("issued_at")
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  learner      Learner      @relation(fields: [learnerId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  payments Payment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([schoolId, invoiceNumber])
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  schoolId      String        @map("school_id")
+  invoiceId     String        @map("invoice_id")
+  amount        Decimal
+  paymentDate   DateTime      @map("payment_date")
+  paymentMethod PaymentMethod @map("payment_method")
+  reference     String?
+  receiptNumber String        @map("receipt_number")
+  recordedById  String        @map("recorded_by_id")
+
+  school     School  @relation(fields: [schoolId], references: [id])
+  invoice    Invoice @relation(fields: [invoiceId], references: [id])
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([invoiceId])
+  @@index([recordedById])
+  @@map("payments")
+}
+
+model AuditLog {
+  id         String  @id @default(uuid())
+  schoolId   String  @map("school_id")
+  userId     String? @map("user_id")
+  action     String
+  entityType String  @map("entity_type")
+  entityId   String  @map("entity_id")
+  oldValues  Json?   @map("old_values")
+  newValues  Json?   @map("new_values")
+  ipAddress  String? @map("ip_address")
+  userAgent  String? @map("user_agent")
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

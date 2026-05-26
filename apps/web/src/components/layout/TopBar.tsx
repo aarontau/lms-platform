@@ -1,0 +1,197 @@
+'use client'
+
+import React, { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { signOut, useSession } from 'next-auth/react'
+import { clsx } from 'clsx'
+import {
+  Menu,
+  Bell,
+  ChevronDown,
+  User,
+  Settings,
+  LogOut,
+  GraduationCap,
+} from 'lucide-react'
+import { RoleBadge } from '@/components/ui/Badge'
+import type { Role } from '@/types'
+
+// ─── Route title map ──────────────────────────────────────────────────────────
+const ROUTE_TITLES: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/learners': 'Learners',
+  '/subjects': 'Subjects & Classes',
+  '/timetable': 'Timetable',
+  '/assessment': 'Assessment',
+  '/reports': 'Reports',
+  '/users': 'User Management',
+  '/users/new': 'Add User',
+  '/settings': 'Settings',
+  '/schools/onboarding': 'School Onboarding',
+}
+
+function getPageTitle(pathname: string): string {
+  // Exact match first
+  if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname]
+  // Prefix match
+  for (const [route, title] of Object.entries(ROUTE_TITLES)) {
+    if (pathname.startsWith(route + '/')) return title
+  }
+  return 'EduTrack LMS'
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+interface TopBarProps {
+  onMenuClick?: () => void
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
+  const { data: session } = useSession()
+  const pathname = usePathname()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const pageTitle = getPageTitle(pathname)
+  const user = session?.user
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleSignOut = async () => {
+    setDropdownOpen(false)
+    await signOut({ callbackUrl: '/login' })
+  }
+
+  return (
+    <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6">
+      <div className="flex items-center h-16 gap-4">
+        {/* Hamburger (mobile) */}
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu"
+          className="lg:hidden p-2 -ml-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
+
+        {/* Page title */}
+        <h1 className="text-lg font-semibold text-gray-900 flex-1 truncate">
+          {pageTitle}
+        </h1>
+
+        {/* Right section */}
+        <div className="flex items-center gap-2">
+          {/* Notifications */}
+          <button
+            type="button"
+            aria-label="Notifications (0 unread)"
+            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Bell className="h-5 w-5" aria-hidden="true" />
+            {/* Badge placeholder */}
+            <span
+              className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full"
+              aria-hidden="true"
+            />
+          </button>
+
+          {/* User dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
+              aria-expanded={dropdownOpen}
+              aria-haspopup="menu"
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              {/* Avatar */}
+              <div className="h-8 w-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm uppercase flex-shrink-0">
+                {user?.firstName?.[0]}
+                {user?.lastName?.[0]}
+              </div>
+
+              {/* Name + role */}
+              <div className="hidden sm:block text-left min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate max-w-[120px]">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                {user?.role && (
+                  <RoleBadge role={user.role as Role} className="text-xs" />
+                )}
+              </div>
+
+              <ChevronDown
+                className={clsx(
+                  'h-4 w-4 text-gray-400 transition-transform duration-150',
+                  dropdownOpen && 'rotate-180',
+                )}
+                aria-hidden="true"
+              />
+            </button>
+
+            {/* Dropdown menu */}
+            {dropdownOpen && (
+              <div
+                role="menu"
+                aria-label="User menu"
+                className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20"
+              >
+                {/* Profile info */}
+                <div className="px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+
+                <Link
+                  href="/profile"
+                  role="menuitem"
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <User className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  My Profile
+                </Link>
+
+                <Link
+                  href="/settings"
+                  role="menuitem"
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Settings className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  Settings
+                </Link>
+
+                <div className="border-t border-gray-100 mt-1 pt-1">
+                  <button
+                    role="menuitem"
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+export default TopBar

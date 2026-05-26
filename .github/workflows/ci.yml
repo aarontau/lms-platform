@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lms_user
+          POSTGRES_PASSWORD: lms_password
+          POSTGRES_DB: lms_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: packages/db
+        env:
+          DATABASE_URL: postgresql://lms_user:lms_password@localhost:5432/lms_test
+      - name: Run migrations
+        run: npx prisma migrate deploy
+        working-directory: packages/db
+        env:
+          DATABASE_URL: postgresql://lms_user:lms_password@localhost:5432/lms_test
+      - name: Run tests
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://lms_user:lms_password@localhost:5432/lms_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
