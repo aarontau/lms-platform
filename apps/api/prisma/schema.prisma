@@ -215,6 +215,63 @@ enum PaymentMethod {
   BURSARY
 }
 
+// ── Screener enums ────────────────────────────────────────────────────────────
+
+enum ScreenerType {
+  DYSLEXIA
+  ADHD_INATTENTIVE
+  ADHD_HYPERACTIVE
+  ADHD_COMBINED
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+}
+
+// ── HR enums ──────────────────────────────────────────────────────────────────
+
+enum DocumentStatus {
+  SUBMITTED
+  OUTSTANDING
+  NOT_APPLICABLE
+}
+
+enum EmploymentType {
+  PERMANENT
+  TEMPORARY
+  CONTRACT
+  SUBSTITUTE
+  INTERN
+}
+
+enum PostLevel {
+  PL1
+  PL2
+  PL3
+  PL4
+  SMT
+}
+
+enum RecruitmentStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEWED
+  OFFERED
+  APPOINTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum RaceGroup {
+  AFRICAN
+  COLOURED
+  INDIAN
+  WHITE
+  OTHER
+}
+
 // =============================================================================
 // GLOBAL MODELS (no school_id — shared across all tenants)
 // =============================================================================
@@ -341,6 +398,7 @@ model School {
   learnerMarks           LearnerMark[]
   diagnosticAssessments  DiagnosticAssessment[]
   learningProfiles       LearningProfile[]
+  learnerScreenings      LearnerScreening[]
   termSbaResults         TermSbaResult[]
   annualSubjectResults   AnnualSubjectResult[]
   reportCards            ReportCard[]
@@ -351,6 +409,8 @@ model School {
   invoices               Invoice[]
   payments               Payment[]
   auditLogs              AuditLog[]
+  teacherRecruitments    TeacherRecruitment[]
+  staffMembers           StaffMember[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -381,6 +441,7 @@ model AcademicYear {
   learnerEnrolments     LearnerEnrolment[]
   diagnosticAssessments DiagnosticAssessment[]
   learningProfiles      LearningProfile[]
+  learnerScreenings     LearnerScreening[]
   termSbaResults        TermSbaResult[]
   annualSubjectResults  AnnualSubjectResult[]
   reportCards           ReportCard[]
@@ -475,12 +536,15 @@ model User {
   assessmentTasksCreated  AssessmentTask[]
   diagnosticAssessments   DiagnosticAssessment[]
   learningProfiles        LearningProfile[]
+  screeningsAdministered  LearnerScreening[]      @relation("ScreeningAdministeredBy")
+  screeningsReviewed      LearnerScreening[]      @relation("ScreeningReviewedBy")
   reportCardsPublished    ReportCard[]
   promotionDecisions      PromotionDecision[]
   notifications           Notification[]
   luritsExports           LuritsExportBatch[]
   paymentsRecorded        Payment[]
   auditLogs               AuditLog[]
+  staffMemberAppointed    StaffMember[]           @relation("StaffAppointedBy")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -550,6 +614,7 @@ model Learner {
   learnerMarks          LearnerMark[]
   diagnosticAssessments DiagnosticAssessment[]
   learningProfiles      LearningProfile[]
+  learnerScreenings     LearnerScreening[]
   termSbaResults        TermSbaResult[]
   annualSubjectResults  AnnualSubjectResult[]
   reportCards           ReportCard[]
@@ -596,6 +661,7 @@ model LearnerEnrolment {
   classId        String          @map("class_id")
   enrolmentDate  DateTime        @map("enrolment_date")
   status         EnrolmentStatus @default(ACTIVE)
+  isRepeating    Boolean         @default(false) @map("is_repeating")
 
   school       School       @relation(fields: [schoolId], references: [id])
   learner      Learner      @relation(fields: [learnerId], references: [id])
@@ -1228,4 +1294,181 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// =============================================================================
+// SCREENER MODELS
+// =============================================================================
+
+/// DSM-5-inspired Dyslexia and ADHD screener administered per learner.
+/// Responses stored as JSON array of { indicatorCode, indicatorText, score }.
+/// riskLevel computed from totalScore thresholds defined per screenerType.
+model LearnerScreening {
+  id                     String      @id @default(uuid())
+  schoolId               String      @map("school_id")
+  learnerId              String      @map("learner_id")
+  academicYearId         String      @map("academic_year_id")
+  screenerType           ScreenerType @map("screener_type")
+  administeredById       String      @map("administered_by_id")
+  administeredAt         DateTime    @map("administered_at")
+
+  /// JSON array: [{ indicatorCode, indicatorText, score (0-3) }]
+  responses              Json
+  totalScore             Int         @map("total_score")
+  riskLevel              RiskLevel   @map("risk_level")
+
+  /// Free-text clinical observations by the teacher
+  teacherObservations    String?     @map("teacher_observations")
+
+  /// Principal review fields
+  reviewedByPrincipal    Boolean     @default(false) @map("reviewed_by_principal")
+  reviewedById           String?     @map("reviewed_by_id")
+  reviewedAt             DateTime?   @map("reviewed_at")
+  principalNotes         String?     @map("principal_notes")
+  followUpRecommended    Boolean     @default(false) @map("follow_up_recommended")
+  referralStatus         String?     @map("referral_status")
+
+  school          School @relation(fields: [schoolId], references: [id])
+  learner         Learner @relation(fields: [learnerId], references: [id])
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  administeredBy  User   @relation("ScreeningAdministeredBy", fields: [administeredById], references: [id])
+  reviewedBy      User?  @relation("ScreeningReviewedBy", fields: [reviewedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([schoolId, learnerId])
+  @@index([learnerId])
+  @@index([academicYearId])
+  @@index([screenerType])
+  @@index([riskLevel])
+  @@index([reviewedByPrincipal])
+  @@map("learner_screenings")
+}
+
+// =============================================================================
+// HR MODELS
+// =============================================================================
+
+/// Teacher recruitment records — one per applicant per post.
+/// Mirrors the Mopani West Education District recruitment spreadsheet
+/// plus additional fields for EEA compliance and appointment tracking.
+model TeacherRecruitment {
+  id                    String            @id @default(uuid())
+  schoolId              String            @map("school_id")
+
+  // Personal details
+  lastName              String            @map("last_name")
+  firstName             String?           @map("first_name")
+  initials              String?
+  idNumber              String?           @map("id_number")
+  dateOfBirth           DateTime?         @map("date_of_birth")
+  gender                Gender?
+  raceGroup             RaceGroup?        @map("race_group")
+  phone                 String?
+  email                 String?
+
+  // Application details
+  postAppliedFor        String?           @map("post_applied_for")
+  subjectSpecialization String?           @map("subject_specialization")
+  applicationDate       DateTime?         @map("application_date")
+  status                RecruitmentStatus @default(APPLIED)
+
+  // Document checklist — mirrors the spreadsheet columns exactly
+  cvStatus              DocumentStatus    @default(OUTSTANDING) @map("cv_status")
+  saceCertStatus        DocumentStatus    @default(OUTSTANDING) @map("sace_cert_status")
+  saceNumber            String?           @map("sace_number")
+  matricCertStatus      DocumentStatus    @default(OUTSTANDING) @map("matric_cert_status")
+  qualCertStatus        DocumentStatus    @default(OUTSTANDING) @map("qual_cert_status")
+  bankLetterStatus      DocumentStatus    @default(OUTSTANDING) @map("bank_letter_status")
+  sarsDocStatus         DocumentStatus    @default(OUTSTANDING) @map("sars_doc_status")
+  sarsNumber            String?           @map("sars_number")
+  proofOfResidenceStatus DocumentStatus   @default(OUTSTANDING) @map("proof_of_residence_status")
+
+  // Highest qualification extracted from submitted certificates
+  highestQualification  String?           @map("highest_qualification")
+
+  // Subject competency flags (recurring issue from spreadsheet comments)
+  hasMathematicsMatric  Boolean?          @map("has_mathematics_matric")
+  hasMathematicsMajor   Boolean?          @map("has_mathematics_major")
+
+  // Process tracking
+  interviewDate         DateTime?         @map("interview_date")
+  interviewNotes        String?           @map("interview_notes")
+  offerDate             DateTime?         @map("offer_date")
+  appointmentDate       DateTime?         @map("appointment_date")
+  startDate             DateTime?         @map("start_date")
+  contractEndDate       DateTime?         @map("contract_end_date")
+
+  comments              String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([schoolId, status])
+  @@map("teacher_recruitments")
+}
+
+/// Active and historical staff members at the school.
+/// Covers appointed teachers and support staff.
+model StaffMember {
+  id                    String         @id @default(uuid())
+  schoolId              String         @map("school_id")
+  userId                String?        @map("user_id")
+
+  // Identity
+  lastName              String         @map("last_name")
+  firstName             String         @map("first_name")
+  initials              String?
+  idNumber              String?        @map("id_number")
+  dateOfBirth           DateTime?      @map("date_of_birth")
+  gender                Gender
+  raceGroup             RaceGroup?     @map("race_group")
+  disabilityStatus      Boolean        @default(false) @map("disability_status")
+  phone                 String?
+  email                 String?
+
+  // Employment details
+  employmentType        EmploymentType @map("employment_type")
+  postLevel             PostLevel      @map("post_level")
+  persalNumber          String?        @map("persal_number")
+  subjectSpecialization String?        @map("subject_specialization")
+  startDate             DateTime       @map("start_date")
+  contractEndDate       DateTime?      @map("contract_end_date")
+  isActive              Boolean        @default(true) @map("is_active")
+
+  // Payroll & compliance
+  salaryNotch           String?        @map("salary_notch")
+  unionMembership       String?        @map("union_membership")
+  leaveBalance          Decimal?       @map("leave_balance")
+
+  // Qualifications stored as JSON array
+  /// [{ institution, qualification, year, isHighest }]
+  qualifications        Json?
+
+  // Emergency contact
+  emergencyContactName  String?        @map("emergency_contact_name")
+  emergencyContactPhone String?        @map("emergency_contact_phone")
+  emergencyContactRel   String?        @map("emergency_contact_rel")
+
+  // Appointment audit
+  appointedById         String?        @map("appointed_by_id")
+  notes                 String?
+
+  school      School @relation(fields: [schoolId], references: [id])
+  appointedBy User?  @relation("StaffAppointedBy", fields: [appointedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@index([schoolId, isActive])
+  @@index([employmentType])
+  @@index([postLevel])
+  @@map("staff_members")
 }
