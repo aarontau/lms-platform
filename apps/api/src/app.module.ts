@@ -14,6 +14,13 @@ import { AttendanceModule } from './modules/attendance/attendance.module'
 import { AssessmentModule } from './modules/assessment/assessment.module'
 import { ReportsModule }    from './modules/reports/reports.module'
 import { PortalModule }     from './modules/portal/portal.module'
+import { ScreeningModule }  from './modules/screening/screening.module'
+import { HrModule }         from './modules/hr/hr.module'
+import { LuritsModule }         from './modules/lurits/lurits.module'
+import { FinanceModule }        from './modules/finance/finance.module'
+import { AnalyticsModule }      from './modules/analytics/analytics.module'
+import { NotificationsModule }  from './modules/notifications/notifications.module'
+
 import { TenantMiddleware } from './common/middleware/tenant.middleware'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './common/guards/roles.guard'
@@ -37,6 +44,12 @@ import { RolesGuard } from './common/guards/roles.guard'
     AssessmentModule,
     ReportsModule,
     PortalModule,
+    ScreeningModule,
+    HrModule,
+    LuritsModule,
+    FinanceModule,
+    AnalyticsModule,
+    NotificationsModule,
   ],
   providers: [
     // Guards run in registration order.

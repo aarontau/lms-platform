@@ -1,6 +1,6 @@
-import {
+﻿import {
   Controller, Get, Post, Put, Delete, Body, Param, Query,
-  Request, HttpCode, HttpStatus, ParseUUIDPipe,
+  Request, HttpCode, HttpStatus,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { Roles, Role } from '../../common/decorators/roles.decorator'
@@ -46,7 +46,7 @@ export class LearnersController {
   @Get(':id')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
   @ApiOperation({ summary: 'Get full learner profile including guardians and enrolment history' })
-  findOne(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Request() req: any, @Param('id') id: string) {
     return this.learnersService.findOne(req.user.schoolId, id)
   }
 
@@ -55,7 +55,7 @@ export class LearnersController {
   @ApiOperation({ summary: 'Update learner biographical or status details' })
   update(
     @Request() req: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateLearnerDto,
   ) {
     return this.learnersService.update(req.user.schoolId, id, dto)
@@ -65,7 +65,7 @@ export class LearnersController {
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deactivate a learner (sets status to INACTIVE)' })
-  deactivate(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+  deactivate(@Request() req: any, @Param('id') id: string) {
     return this.learnersService.deactivate(req.user.schoolId, id)
   }
 
@@ -74,7 +74,7 @@ export class LearnersController {
   @ApiOperation({ summary: 'Create a new guardian and link to learner' })
   createGuardian(
     @Request() req: any,
-    @Param('id', ParseUUIDPipe) learnerId: string,
+    @Param('id') learnerId: string,
     @Body() dto: CreateGuardianDto,
   ) {
     return this.learnersService.createGuardian(req.user.schoolId, learnerId, dto)
@@ -85,7 +85,7 @@ export class LearnersController {
   @ApiOperation({ summary: 'Link an existing guardian to a learner' })
   linkGuardian(
     @Request() req: any,
-    @Param('id', ParseUUIDPipe) learnerId: string,
+    @Param('id') learnerId: string,
     @Body() dto: LinkGuardianDto,
   ) {
     return this.learnersService.linkGuardian(req.user.schoolId, learnerId, dto)
@@ -94,7 +94,7 @@ export class LearnersController {
   @Get(':id/guardians')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
   @ApiOperation({ summary: "Get all guardians linked to a learner" })
-  getGuardians(@Request() req: any, @Param('id', ParseUUIDPipe) learnerId: string) {
+  getGuardians(@Request() req: any, @Param('id') learnerId: string) {
     return this.learnersService.getGuardians(req.user.schoolId, learnerId)
   }
 }

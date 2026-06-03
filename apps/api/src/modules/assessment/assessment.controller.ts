@@ -29,8 +29,13 @@ import { AssessmentService } from './assessment.service'
 import { CreatePoaDto, PoaStatus } from './dto/create-poa.dto'
 import { CreateTaskDto, UpdateTaskDto } from './dto/create-task.dto'
 import { CaptureMarksDto } from './dto/capture-marks.dto'
-import { Roles } from '../auth/decorators/roles.decorator'
+import { Roles, Role } from '../../common/decorators/roles.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+
+const ADMIN_ROLES  = [Role.SCHOOL_ADMIN, Role.PRINCIPAL] as const
+const STAFF_ROLES  = [Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER] as const
+const HOD_ROLES    = [Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD] as const
+const ALL_ROLES    = [Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER] as const
 
 @Controller('assessment')
 export class AssessmentController {
@@ -39,13 +44,13 @@ export class AssessmentController {
   // ─── POA ───────────────────────────────────────────────────────────────────
 
   @Post('poa')
-  @Roles('ADMIN', 'TEACHER')
+  @Roles(...STAFF_ROLES)
   createPoa(@CurrentUser() user: any, @Body() dto: CreatePoaDto) {
     return this.svc.createPoa(user.schoolId, user.id, dto)
   }
 
   @Get('poa')
-  @Roles('ADMIN', 'TEACHER', 'HOD')
+  @Roles(...ALL_ROLES)
   listPoas(
     @CurrentUser() user: any,
     @Query('subjectClassId') subjectClassId?: string,
@@ -56,7 +61,7 @@ export class AssessmentController {
   }
 
   @Get('poa/:id')
-  @Roles('ADMIN', 'TEACHER', 'HOD')
+  @Roles(...ALL_ROLES)
   getOnePoa(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,7 +70,7 @@ export class AssessmentController {
   }
 
   @Patch('poa/:id/status')
-  @Roles('ADMIN', 'HOD')
+  @Roles(...HOD_ROLES)
   updatePoaStatus(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
@@ -77,13 +82,13 @@ export class AssessmentController {
   // ─── Tasks ─────────────────────────────────────────────────────────────────
 
   @Post('tasks')
-  @Roles('ADMIN', 'TEACHER')
+  @Roles(...STAFF_ROLES)
   createTask(@CurrentUser() user: any, @Body() dto: CreateTaskDto) {
     return this.svc.createTask(user.schoolId, user.id, dto)
   }
 
   @Patch('tasks/:id')
-  @Roles('ADMIN', 'TEACHER')
+  @Roles(...STAFF_ROLES)
   updateTask(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
@@ -94,7 +99,7 @@ export class AssessmentController {
 
   @Delete('tasks/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles('ADMIN', 'TEACHER')
+  @Roles(...STAFF_ROLES)
   deleteTask(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
@@ -106,13 +111,13 @@ export class AssessmentController {
 
   @Post('marks')
   @HttpCode(HttpStatus.OK)
-  @Roles('ADMIN', 'TEACHER')
+  @Roles(...STAFF_ROLES)
   captureMarks(@CurrentUser() user: any, @Body() dto: CaptureMarksDto) {
     return this.svc.captureMarks(user.schoolId, user.id, dto)
   }
 
   @Get('marks/:taskId')
-  @Roles('ADMIN', 'TEACHER', 'HOD')
+  @Roles(...ALL_ROLES)
   getTaskMarks(
     @CurrentUser() user: any,
     @Param('taskId', ParseUUIDPipe) taskId: string,
@@ -123,7 +128,7 @@ export class AssessmentController {
   // ─── Markbook ──────────────────────────────────────────────────────────────
 
   @Get('markbook/:poaId')
-  @Roles('ADMIN', 'TEACHER', 'HOD')
+  @Roles(...ALL_ROLES)
   getMarkbook(
     @CurrentUser() user: any,
     @Param('poaId', ParseUUIDPipe) poaId: string,
@@ -134,7 +139,7 @@ export class AssessmentController {
   // ─── At-Risk ───────────────────────────────────────────────────────────────
 
   @Get('at-risk/:subjectClassId')
-  @Roles('ADMIN', 'TEACHER', 'HOD')
+  @Roles(...ALL_ROLES)
   getAtRiskLearners(
     @CurrentUser() user: any,
     @Param('subjectClassId', ParseUUIDPipe) subjectClassId: string,

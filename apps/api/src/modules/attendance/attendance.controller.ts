@@ -53,6 +53,21 @@ export class AttendanceController {
     return this.attendanceService.getOrCreateRegister(req.user.schoolId, req.user.id, dto)
   }
 
+  // ─── Static sub-paths MUST come before :id to avoid param capture ────────
+
+  @Get('registers/by-class')
+  @Roles(Role.SUPER_ADMIN, Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
+  @ApiQuery({ name: 'classId', required: true })
+  @ApiQuery({ name: 'date',    required: true, description: 'ISO date e.g. 2026-05-26' })
+  @ApiOperation({ summary: 'Get register for a class on a specific date' })
+  getRegisterByClassDate(
+    @Request() req: any,
+    @Query('classId') classId: string,
+    @Query('date')    date:    string,
+  ) {
+    return this.attendanceService.getRegisterByClassDate(req.user.schoolId, classId, date)
+  }
+
   @Get('registers/:id')
   @Roles(Role.SUPER_ADMIN, Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
   @ApiOperation({ summary: 'Get a specific register with all attendance records' })
@@ -75,21 +90,6 @@ export class AttendanceController {
     @Body() dto: MarkAttendanceDto,
   ) {
     return this.attendanceService.markAttendance(id, req.user.schoolId, dto)
-  }
-
-  // ─── Lookup by class + date ───────────────────────────────────────────────────
-
-  @Get('registers/by-class')
-  @Roles(Role.SUPER_ADMIN, Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
-  @ApiQuery({ name: 'classId', required: true })
-  @ApiQuery({ name: 'date',    required: true, description: 'ISO date e.g. 2026-05-26' })
-  @ApiOperation({ summary: 'Get register for a class on a specific date' })
-  getRegisterByClassDate(
-    @Request() req: any,
-    @Query('classId') classId: string,
-    @Query('date')    date:    string,
-  ) {
-    return this.attendanceService.getRegisterByClassDate(req.user.schoolId, classId, date)
   }
 
   // ─── Summary Reports ─────────────────────────────────────────────────────────

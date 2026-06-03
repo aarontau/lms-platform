@@ -168,7 +168,7 @@ export default function PortalHomePage() {
             {greeting()}, {user?.firstName}! 👋
           </h1>
           <p className="mt-1 text-primary-100 text-sm max-w-md">
-            Here&apos;s an overview of your {(children as any[]).length === 1 ? 'child' : 'children'} at school today.
+            Here&apos;s an overview of your {children.length === 1 ? 'child' : 'children'} at school today.
           </p>
         </div>
       </div>
@@ -190,7 +190,7 @@ export default function PortalHomePage() {
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             Failed to load children. Please refresh.
           </div>
-        ) : (children as any[]).length === 0 ? (
+        ) : children.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-16 text-center">
             <GraduationCap className="h-12 w-12 text-gray-200 mx-auto mb-4" />
             <p className="text-sm font-semibold text-gray-500">No learners linked to your account</p>
@@ -200,7 +200,7 @@ export default function PortalHomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {(children as any[]).map((child) => (
+            {children.map((child) => (
               <ChildCard key={child.learnerId} child={child} />
             ))}
           </div>

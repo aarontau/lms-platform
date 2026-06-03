@@ -283,7 +283,7 @@ export default function UsersPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500 p-5 shadow-md">
         <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
         <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
-        <UsersIcon className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[5.5rem] font-black text-white/10 leading-none select-none" aria-hidden="true">{ }</span>
 
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

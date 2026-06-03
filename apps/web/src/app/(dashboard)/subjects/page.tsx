@@ -6,8 +6,8 @@ import {
   BookOpen, Plus, Trash2, UserCheck, ChevronDown,
   CheckCircle2, XCircle, AlertCircle, Search,
 } from 'lucide-react'
-import { subjectsApi, gradesApi, usersApi } from '@/lib/api'
-import type { SubjectClass, SchoolSubject, User } from '@/types'
+import { subjectsApi, gradesApi, usersApi, academicYearsApi } from '@/lib/api'
+import type { AcademicYear, SubjectClass, SchoolSubject, User } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const SUBJECT_GROUPS = ['Language', 'Mathematics', 'Sciences', 'Social Sciences',
@@ -135,6 +135,15 @@ export default function SubjectsPage() {
   const [search, setSearch]         = useState('')
   const [showAddModal, setShowModal] = useState(false)
 
+  // Resolve current academic year
+  const { data: academicYears = [] } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+  const currentAY    = (academicYears as AcademicYear[]).find((ay) => ay.isCurrent)
+  const academicYearId = currentAY?.id ?? ''
+
   // Data
   const { data: schoolSubjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['school-subjects'],
@@ -150,11 +159,11 @@ export default function SubjectsPage() {
   })
   const { data: teachers = [] } = useQuery({
     queryKey: ['users', 'TEACHER'],
-    queryFn:  () => usersApi.getAll({ role: 'TEACHER' as any }),
+    queryFn:  () => usersApi.getAll({ role: 'TEACHER' }),
   })
   const { data: grades = [] } = useQuery({
     queryKey: ['grades'],
-    queryFn:  gradesApi.getAll,
+    queryFn:  () => gradesApi.getAll(),
   })
 
   // All classes from all grades
@@ -201,7 +210,7 @@ export default function SubjectsPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 p-5 shadow-md">
         <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
         <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
-        <BookOpen className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[5rem] font-black text-white/10 leading-none select-none italic" aria-hidden="true">f(x)</span>
 
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -364,7 +373,7 @@ export default function SubjectsPage() {
           subjects={schoolSubjects}
           teachers={teachers as User[]}
           classes={allClasses}
-          academicYearId=""
+          academicYearId={academicYearId}
         />
       )}
     </div>

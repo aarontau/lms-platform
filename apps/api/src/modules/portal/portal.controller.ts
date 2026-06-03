@@ -15,7 +15,7 @@
  */
 
 import {
-  Controller, Get, Param, ParseUUIDPipe,
+  Controller, Get, Param,
 } from '@nestjs/common'
 import { PortalService }  from './portal.service'
 import { Roles }          from '../../common/decorators/roles.decorator'
@@ -35,7 +35,7 @@ export class PortalController {
   @Get('children/:id/summary')
   getChildSummary(
     @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.svc.getChildSummary(user.id, user.schoolId, id)
   }
@@ -43,7 +43,7 @@ export class PortalController {
   @Get('children/:id/marks')
   getChildMarks(
     @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.svc.getChildMarks(user.id, user.schoolId, id)
   }
@@ -51,7 +51,7 @@ export class PortalController {
   @Get('children/:id/attendance')
   getChildAttendance(
     @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.svc.getChildAttendance(user.id, user.schoolId, id)
   }
@@ -59,7 +59,7 @@ export class PortalController {
   @Get('children/:id/assessments')
   getChildUpcomingAssessments(
     @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.svc.getChildUpcomingAssessments(user.id, user.schoolId, id)
   }
@@ -67,7 +67,7 @@ export class PortalController {
   @Get('children/:id/reports')
   getChildReports(
     @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.svc.getChildReports(user.id, user.schoolId, id)
   }

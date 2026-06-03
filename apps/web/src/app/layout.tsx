@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Providers from '@/components/layout/Providers'
@@ -11,8 +11,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'EduTrack LMS',
-    template: '%s | EduTrack LMS',
+    default: 'UL-Junior Project',
+    template: '%s | UL-Junior Project',
   },
   description: 'South African Multi-School Learner Management System',
 }

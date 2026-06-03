@@ -13,11 +13,121 @@ import {
   ChevronRight,
   ArrowUpRight,
   Activity,
+  BrainCircuit,
+  Eye,
+  Award,
+  FileText,
+  XCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { usersApi } from '@/lib/api'
+import { usersApi, screeningApi, learnersApi, dashboardApi } from '@/lib/api'
 import { RoleBadge } from '@/components/ui/Badge'
 import type { User, Role } from '@/types'
+import Link from 'next/link'
+
+// ─── Risk badge ───────────────────────────────────────────────────────────────
+const RISK_BADGE: Record<string, string> = {
+  HIGH:     'bg-red-100 text-red-700 border border-red-200',
+  MODERATE: 'bg-amber-100 text-amber-700 border border-amber-200',
+  LOW:      'bg-green-100 text-green-700 border border-green-200',
+}
+
+function RiskBadge({ level }: { level: string }) {
+  return (
+    <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${RISK_BADGE[level] ?? 'bg-gray-100 text-gray-500'}`}>
+      {level}
+    </span>
+  )
+}
+
+const SCREENER_LABEL: Record<string, string> = {
+  DYSLEXIA:         'Dyslexia',
+  ADHD_INATTENTIVE: 'ADHD (Inattentive)',
+  ADHD_HYPERACTIVE: 'ADHD (Hyperactive)',
+  ADHD_COMBINED:    'ADHD (Combined)',
+}
+
+// ─── Principal screening panel ────────────────────────────────────────────────
+function PrincipalScreeningPanel() {
+  const { data: summary } = useQuery({
+    queryKey: ['screening-summary'],
+    queryFn:  () => screeningApi.getPrincipalSummary(),
+    staleTime: 60_000,
+  })
+  const { data: pending = [] } = useQuery({
+    queryKey: ['screening-pending'],
+    queryFn:  () => screeningApi.list({ reviewedByPrincipal: false, riskLevel: 'HIGH' }),
+    staleTime: 30_000,
+  })
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-rose-50/60">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="h-4 w-4 text-rose-500" />
+          <h2 className="font-semibold text-gray-900 text-sm">Screener Summary</h2>
+          {summary?.pendingReview > 0 && (
+            <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold">
+              {summary.pendingReview} pending
+            </span>
+          )}
+        </div>
+        <Link href="/screening"
+          className="text-xs text-primary-600 hover:text-primary-700 font-semibold flex items-center gap-1">
+          View all <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      {/* Stats row */}
+      {summary && (
+        <div className="grid grid-cols-3 gap-0 border-b border-gray-100">
+          {[
+            { label: 'Total Screened', value: summary.total,       bg: 'bg-gray-50' },
+            { label: 'High Risk',      value: summary.highRisk,    bg: 'bg-red-50' },
+            { label: 'Awaiting Review',value: summary.pendingReview, bg: 'bg-amber-50' },
+          ].map((s) => (
+            <div key={s.label} className={`px-4 py-3 text-center ${s.bg}`}>
+              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* High-risk pending list */}
+      {pending.length === 0 ? (
+        <div className="px-5 py-6 text-center text-xs text-gray-400">
+          No high-risk screenings pending review
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-50">
+          {pending.slice(0, 5).map((s) => (
+            <li key={s.id} className="flex items-center gap-3 px-5 py-3">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-rose-500 to-rose-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {s.learner?.firstName?.[0]}{s.learner?.lastName?.[0]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {s.learner?.firstName} {s.learner?.lastName}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {SCREENER_LABEL[s.screenerType] ?? s.screenerType}
+                  {' · '}Score: {s.totalScore}
+                </p>
+              </div>
+              <RiskBadge level={s.riskLevel} />
+              <Link href={`/screening/${s.id}`}
+                className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                <Eye className="h-3.5 w-3.5" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 interface StatCardProps {
@@ -117,8 +227,39 @@ export default function DashboardPage() {
     enabled: !!session,
   })
 
-  const learnerCount = users?.filter((u: User) => u.role === 'LEARNER').length ?? 0
-  const teacherCount = users?.filter((u: User) => u.role === 'TEACHER').length ?? 0
+  // Real dashboard stats from DB
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => dashboardApi.getStats(),
+    enabled: !!session,
+    staleTime: 60_000,
+  })
+
+  // Learner count comes from the Learner table (not User table)
+  const { data: learnerData } = useQuery({
+    queryKey: ['learners-count'],
+    queryFn: () => learnersApi.getAll({ limit: 1, page: 1 }),
+    enabled: !!session,
+    staleTime: 60_000,
+  })
+
+  const learnerCount = stats?.learnerCount ?? learnerData?.meta?.total ?? 0
+  const teacherCount = stats?.teacherCount ?? users?.filter((u: User) => u.role === 'TEACHER').length ?? 0
+  const classCount   = stats?.classCount   ?? 0
+  const activeTerm   = stats?.activeTerm
+
+  // Compute live term progress from start/end dates
+  const termProgress = React.useMemo(() => {
+    if (!activeTerm) return null
+    const now   = Date.now()
+    const start = new Date(activeTerm.startDate).getTime()
+    const end   = new Date(activeTerm.endDate).getTime()
+    if (now <= start) return { pct: 0, weeksLeft: Math.ceil((end - now) / (7 * 864e5)), endsLabel: format(new Date(activeTerm.endDate), 'd MMMM yyyy') }
+    if (now >= end)   return { pct: 100, weeksLeft: 0, endsLabel: format(new Date(activeTerm.endDate), 'd MMMM yyyy') }
+    const pct      = Math.round(((now - start) / (end - start)) * 100)
+    const weeksLeft = Math.ceil((end - now) / (7 * 864e5))
+    return { pct, weeksLeft, endsLabel: format(new Date(activeTerm.endDate), 'd MMMM yyyy') }
+  }, [activeTerm])
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -139,7 +280,7 @@ export default function DashboardPage() {
             <circle cx="50"  cy="180" r="60" fill="white" />
           </svg>
         </div>
-        <Activity className="absolute right-6 bottom-6 h-24 w-24 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[8rem] font-black text-white/10 leading-none select-none" aria-hidden="true">Σ</span>
 
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -170,19 +311,17 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard
             title="Total Learners"
-            value={usersLoading ? '--' : learnerCount}
+            value={learnerCount}
             subtitle="Enrolled this year"
-            trend="+12 this month"
             icon={GraduationCap}
             gradient="bg-gradient-to-br from-violet-600 to-violet-500"
             iconBg="bg-white/20"
-            loading={usersLoading}
+            loading={!learnerData && usersLoading}
           />
           <StatCard
             title="Total Teachers"
             value={usersLoading ? '--' : teacherCount}
             subtitle="Active staff members"
-            trend="+2 this term"
             icon={Users}
             gradient="bg-gradient-to-br from-emerald-600 to-emerald-500"
             iconBg="bg-white/20"
@@ -190,22 +329,92 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Active Classes"
-            value={24}
+            value={classCount}
             subtitle="Across all grades"
             icon={BookOpen}
             gradient="bg-gradient-to-br from-blue-600 to-blue-500"
             iconBg="bg-white/20"
+            loading={!stats && usersLoading}
           />
           <StatCard
             title="Current Term"
-            value="Term 2"
-            subtitle="2026 Academic Year"
+            value={activeTerm ? activeTerm.name : 'No Active Term'}
+            subtitle={activeTerm ? `${new Date(activeTerm.startDate).getFullYear()} Academic Year` : 'Not configured'}
             icon={Calendar}
             gradient="bg-gradient-to-br from-amber-500 to-orange-500"
             iconBg="bg-white/20"
+            loading={!stats && usersLoading}
           />
         </div>
       </div>
+
+      {/* ── Principal section ───────────────────────────────────────────── */}
+      {(user?.role === 'PRINCIPAL' || user?.role === 'SCHOOL_ADMIN') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PrincipalScreeningPanel />
+
+          {/* Promotion Decisions widget */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-violet-50/60">
+              <div className="flex items-center gap-2">
+                <Award className="h-4 w-4 text-violet-500" />
+                <h2 className="font-semibold text-gray-900 text-sm">CAPS Promotion Decisions</h2>
+              </div>
+              <Link href="/reports/promotion"
+                className="text-xs text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1">
+                Manage <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            {stats?.promotion ? (
+              <>
+                <div className="grid grid-cols-3 divide-x divide-gray-100">
+                  {[
+                    { label: 'Promote',   value: stats.promotion.promote,  color: 'text-emerald-700', bg: 'bg-emerald-50', icon: <TrendingUp className="h-4 w-4" /> },
+                    { label: 'Progress',  value: stats.promotion.progress, color: 'text-amber-700',   bg: 'bg-amber-50',   icon: <AlertCircle className="h-4 w-4" /> },
+                    { label: 'Repeat',    value: stats.promotion.repeat,   color: 'text-red-700',     bg: 'bg-red-50',     icon: <XCircle className="h-4 w-4" /> },
+                  ].map((s) => (
+                    <div key={s.label} className={`px-4 py-5 text-center ${s.bg}`}>
+                      <div className={`flex justify-center mb-1.5 ${s.color}`}>{s.icon}</div>
+                      <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 font-medium">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 py-3.5">
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <span className="text-2xs text-gray-400 uppercase font-semibold tracking-wide">
+                      Promotion rate
+                    </span>
+                    <span className="ml-auto text-xs font-bold text-emerald-700">
+                      {stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat > 0
+                        ? Math.round((stats.promotion.promote / (stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat)) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex">
+                    <div className="bg-emerald-500 h-full transition-all duration-700"
+                      style={{ width: `${stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat > 0 ? Math.round((stats.promotion.promote / (stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat)) * 100) : 0}%` }} />
+                    <div className="bg-amber-400 h-full transition-all duration-700"
+                      style={{ width: `${stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat > 0 ? Math.round((stats.promotion.progress / (stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat)) * 100) : 0}%` }} />
+                    <div className="bg-red-400 h-full transition-all duration-700"
+                      style={{ width: `${stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat > 0 ? Math.round((stats.promotion.repeat / (stats.promotion.promote + stats.promotion.progress + stats.promotion.repeat)) * 100) : 0}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Auto-calculated from annual CAPS results
+                    {activeTerm ? ` · ${new Date(activeTerm.startDate).getFullYear()}` : ''}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="py-10 text-center">
+                <div className="h-8 w-8 mx-auto bg-gray-100 rounded-full animate-pulse mb-2" />
+                <p className="text-xs text-gray-400">Loading…</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Lower section ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -260,10 +469,10 @@ export default function DashboardPage() {
 
           <div className="p-5 space-y-3">
             {[
-              { label: 'Assessments this term', value: 48,  icon: BookOpen,       color: 'bg-green-500',  light: 'bg-green-50',  pct: 80 },
-              { label: 'Reports generated',      value: 12,  icon: TrendingUp,     color: 'bg-blue-500',   light: 'bg-blue-50',   pct: 25 },
-              { label: 'Parent accounts',        value: 186, icon: Users,          color: 'bg-violet-500', light: 'bg-violet-50', pct: 65 },
-              { label: 'Upcoming assessments',   value: 7,   icon: Calendar,       color: 'bg-amber-500',  light: 'bg-amber-50',  pct: 14 },
+              { label: 'Report cards (total)',   value: (stats?.reports?.published ?? 0) + (stats?.reports?.draft ?? 0), icon: FileText,  color: 'bg-blue-500',   light: 'bg-blue-50',   pct: 100 },
+              { label: 'Published reports',      value: stats?.reports?.published ?? 0,      icon: TrendingUp,     color: 'bg-emerald-500', light: 'bg-emerald-50', pct: stats && (stats.reports.published + stats.reports.draft) > 0 ? Math.round((stats.reports.published / (stats.reports.published + stats.reports.draft)) * 100) : 0 },
+              { label: 'Parent portal accounts', value: stats?.parentCount ?? 0,             icon: Users,          color: 'bg-violet-500', light: 'bg-violet-50', pct: Math.min(100, Math.round(((stats?.parentCount ?? 0) / Math.max(1, learnerCount)) * 100)) },
+              { label: 'Active classes',         value: stats?.classCount ?? classCount,     icon: BookOpen,       color: 'bg-amber-500',  light: 'bg-amber-50',  pct: 100 },
             ].map((stat) => {
               const Icon = stat.icon
               return (
@@ -288,21 +497,28 @@ export default function DashboardPage() {
           </div>
 
           {/* Term progress */}
-          <div className="px-5 pb-5">
-            <div className="p-4 rounded-xl bg-primary-50 border border-primary-100">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-primary-700">Term 2 Progress</p>
-                <span className="text-xs font-bold text-primary-600">62%</span>
+          {termProgress && activeTerm && (
+            <div className="px-5 pb-5">
+              <div className="p-4 rounded-xl bg-primary-50 border border-primary-100">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-primary-700">{activeTerm.name} Progress</p>
+                  <span className="text-xs font-bold text-primary-600">{termProgress.pct}%</span>
+                </div>
+                <div className="h-2 bg-primary-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-700"
+                    style={{ width: `${termProgress.pct}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-primary-500">
+                  Ends {termProgress.endsLabel}
+                  {termProgress.weeksLeft > 0
+                    ? ` · ${termProgress.weeksLeft} week${termProgress.weeksLeft !== 1 ? 's' : ''} remaining`
+                    : ' · Completed'}
+                </p>
               </div>
-              <div className="h-2 bg-primary-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-700"
-                  style={{ width: '62%' }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-primary-500">Ends 20 June 2026 &middot; 5 weeks remaining</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -8,8 +8,9 @@ import {
   RefreshCw, Users, TrendingDown,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { reportsApi } from '@/lib/api'
-import { gradesApi }   from '@/lib/api'
+import Link from 'next/link'
+import { reportsApi, gradesApi, academicYearsApi } from '@/lib/api'
+import type { AcademicYear, Grade } from '@/types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type ReportStatus = 'DRAFT' | 'PUBLISHED'
@@ -208,14 +209,34 @@ export default function ReportsPage() {
   const [tab,            setTab]            = useState<'cards' | 'at-risk'>('cards')
   const [showGenModal,   setShowGenModal]   = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [searchDebounced,setSearchDebounced] = useState('')
   const [statusFilter,   setStatusFilter]   = useState<ReportStatus | ''>('')
   const [publishingId,   setPublishingId]   = useState<string | null>(null)
+  const [page,           setPage]           = useState(1)
+  const LIMIT = 25
 
-  // Fetch report cards
-  const { data: reportCards = [], isLoading: cardsLoading } = useQuery({
-    queryKey: ['report-cards', statusFilter],
-    queryFn: () => reportsApi.listReportCards(statusFilter ? { status: statusFilter } : {}),
+  // Debounce search
+  React.useEffect(() => {
+    const t = setTimeout(() => { setSearchDebounced(searchQuery); setPage(1) }, 350)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  // Reset page on filter change
+  React.useEffect(() => { setPage(1) }, [statusFilter])
+
+  // Fetch report cards (paginated)
+  const { data: reportData, isLoading: cardsLoading } = useQuery({
+    queryKey: ['report-cards', statusFilter, searchDebounced, page],
+    queryFn: () => reportsApi.listReportCards({
+      ...(statusFilter      ? { status: statusFilter }         : {}),
+      ...(searchDebounced   ? { search: searchDebounced }      : {}),
+      page,
+      limit: LIMIT,
+    }),
   })
+
+  const reportCards = reportData?.data ?? []
+  const reportMeta  = reportData?.meta
 
   // Fetch at-risk learners
   const { data: atRisk = [], isLoading: atRiskLoading } = useQuery({
@@ -229,6 +250,13 @@ export default function ReportsPage() {
     queryFn:  () => gradesApi.getAll(),
   })
 
+  // Fetch academic years to populate term list in generate modal
+  const { data: academicYears = [] } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+
   // Publish mutation
   const publishMutation = useMutation({
     mutationFn: (id: string) => reportsApi.publishReport(id),
@@ -238,33 +266,22 @@ export default function ReportsPage() {
     },
   })
 
-  // Filter report cards by search
-  const filtered = (reportCards as ReportCard[]).filter((card) => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return (
-      `${card.learner.firstName} ${card.learner.lastName}`.toLowerCase().includes(q) ||
-      card.learner.admissionNumber?.toLowerCase().includes(q) ||
-      card.term?.name.toLowerCase().includes(q)
-    )
-  })
+  const filtered = reportCards as ReportCard[]
 
-  // Stats
-  const totalCards     = (reportCards as ReportCard[]).length
-  const publishedCards = (reportCards as ReportCard[]).filter((c) => c.status === 'PUBLISHED').length
-  const draftCards     = totalCards - publishedCards
+  // Stats — use server-side counts so they reflect the whole school, not just the current page
+  const totalCards     = reportMeta?.total          ?? 0
+  const publishedCards = reportMeta?.publishedCount ?? 0
+  const draftCards     = reportMeta?.draftCount     ?? 0
   const atRiskCount    = (atRisk as AtRiskRecord[]).length
 
-  // Collect terms from report cards for the generate modal
-  const termSet = new Map<string, { id: string; name: string; termNumber: number }>()
-  ;(reportCards as ReportCard[]).forEach((c) => {
-    if (c.term) termSet.set(c.term.id, c.term)
-  })
-  const terms = Array.from(termSet.values())
+  // Collect terms from the current academic year
+  const currentAY = (academicYears as AcademicYear[]).find((ay) => ay.isCurrent)
+  const terms: Array<{ id: string; name: string; termNumber: number }> =
+    currentAY?.terms ?? []
 
   // Collect classes from grades
-  const classes = (grades as any[]).flatMap((g: any) =>
-    (g.classes ?? []).map((c: any) => ({ ...c, grade: g }))
+  const classes = (grades as Grade[]).flatMap((g) =>
+    (g.classes ?? []).map((c) => ({ ...c, grade: g }))
   )
 
   return (
@@ -274,7 +291,7 @@ export default function ReportsPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-700 via-rose-600 to-pink-600 p-5 shadow-md">
         <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
         <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
-        <BarChart2 className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[6rem] font-black text-white/10 leading-none select-none" aria-hidden="true">A+</span>
 
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -283,13 +300,22 @@ export default function ReportsPage() {
               Generate, review, and publish learner report cards
             </p>
           </div>
-          <button
-            onClick={() => setShowGenModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-rose-700 bg-white rounded-xl hover:bg-rose-50 transition-colors shadow-sm self-start sm:self-auto"
-          >
-            <FileText className="h-4 w-4" />
-            Generate Reports
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 self-start sm:self-auto">
+            <Link
+              href="/reports/promotion"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/90 bg-white/15 hover:bg-white/25 border border-white/30 rounded-xl transition-colors"
+            >
+              <Users className="h-4 w-4" />
+              Promotions
+            </Link>
+            <button
+              onClick={() => setShowGenModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-rose-700 bg-white rounded-xl hover:bg-rose-50 transition-colors shadow-sm"
+            >
+              <FileText className="h-4 w-4" />
+              Generate Reports
+            </button>
+          </div>
         </div>
       </div>
 
@@ -318,7 +344,7 @@ export default function ReportsPage() {
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
-              onClick={() => setTab(key as any)}
+              onClick={() => setTab(key as 'cards' | 'at-risk')}
               className={[
                 'pb-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors',
                 tab === key
@@ -356,7 +382,7 @@ export default function ReportsPage() {
               {(['', 'DRAFT', 'PUBLISHED'] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setStatusFilter(s as any)}
+                  onClick={() => setStatusFilter(s as ReportStatus | '')}
                   className={[
                     'px-3.5 py-2 text-xs font-semibold rounded-xl border transition-colors',
                     statusFilter === s
@@ -445,15 +471,42 @@ export default function ReportsPage() {
                               Publish
                             </button>
                           )}
-                          <button className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                          <Link
+                            href={`/reports/${card.id}`}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+                          >
                             <ChevronRight className="h-4 w-4" />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            )}
+
+            {/* ── Pagination ─────────────────────────────────────────────── */}
+            {reportMeta && reportMeta.totalPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/40">
+                <p className="text-xs text-gray-500">
+                  {(reportMeta.page - 1) * reportMeta.limit + 1}–{Math.min(reportMeta.page * reportMeta.limit, reportMeta.total)} of {reportMeta.total} report cards
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+                  >←</button>
+                  <span className="px-3 py-1 text-xs text-gray-600 font-medium">
+                    {reportMeta.page} / {reportMeta.totalPages}
+                  </span>
+                  <button
+                    disabled={page >= reportMeta.totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+                  >→</button>
+                </div>
+              </div>
             )}
           </div>
         </div>

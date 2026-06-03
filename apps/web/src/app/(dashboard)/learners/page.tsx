@@ -60,7 +60,7 @@ export default function LearnersPage() {
         gradeId: gradeId || undefined,
         status:  (status || undefined) as LearnerStatus | undefined,
         page,
-        limit: 20,
+        limit: 50,
       }),
     placeholderData: (prev: any) => prev,
   })

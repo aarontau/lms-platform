@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common'
+import { PrismaService } from '../../prisma/prisma.service'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
 import { UsersService } from '../users/users.service'
@@ -8,7 +9,8 @@ import { AuthResponseDto } from './dto/auth-response.dto'
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
+    private readonly jwtService:   JwtService,
+    private readonly prisma:       PrismaService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -61,6 +63,29 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Failed to generate authentication token')
     }
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters')
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    })
+    if (!user) throw new NotFoundException('User not found')
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+    if (!valid) throw new BadRequestException('Current password is incorrect')
+
+    const newHash = await bcrypt.hash(newPassword, 10)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data:  { passwordHash: newHash },
+    })
+
+    return { message: 'Password updated successfully' }
   }
 
   async getMe(userId: string) {

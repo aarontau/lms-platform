@@ -203,6 +203,59 @@ export class SchoolsService {
     })
   }
 
+  // ── Dashboard stats ──────────────────────────────────────────────────────────
+
+  async getDashboardStats(schoolId: string) {
+    const [
+      learnerCount,
+      teacherCount,
+      classCount,
+      activeTerm,
+      reportStats,
+      promotionCounts,
+      parentCount,
+    ] = await Promise.all([
+      this.prisma.learner.count({ where: { schoolId, status: 'ACTIVE' } }),
+      this.prisma.user.count({ where: { schoolId, role: 'TEACHER', isActive: true } }),
+      this.prisma.class.count({ where: { schoolId } }),
+      this.prisma.term.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true, name: true, termNumber: true, startDate: true, endDate: true },
+      }),
+      // Report card counts
+      this.prisma.reportCard.groupBy({
+        by: ['status'],
+        where: { schoolId },
+        _count: true,
+      }),
+      // Promotion decision summary
+      this.prisma.promotionDecision.groupBy({
+        by: ['finalDecision'],
+        where: { schoolId },
+        _count: true,
+      }),
+      // Parent portal accounts
+      this.prisma.user.count({ where: { schoolId, role: 'PARENT', isActive: true } }),
+    ])
+
+    const publishedReports = reportStats.find((s) => s.status === 'PUBLISHED')?._count ?? 0
+    const draftReports     = reportStats.find((s) => s.status === 'DRAFT')?._count     ?? 0
+
+    const promoteCount  = promotionCounts.find((s) => s.finalDecision === 'PROMOTE')?._count  ?? 0
+    const progressCount = promotionCounts.find((s) => s.finalDecision === 'PROGRESS')?._count ?? 0
+    const repeatCount   = promotionCounts.find((s) => s.finalDecision === 'REPEAT')?._count   ?? 0
+
+    return {
+      learnerCount,
+      teacherCount,
+      classCount,
+      activeTerm: activeTerm ?? null,
+      reports: { published: publishedReports, draft: draftReports },
+      promotion: { promote: promoteCount, progress: progressCount, repeat: repeatCount },
+      parentCount,
+    }
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   /**

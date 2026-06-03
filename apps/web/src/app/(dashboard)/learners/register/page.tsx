@@ -8,8 +8,8 @@ import {
   ChevronRight, ChevronLeft, Check, UserCircle,
   BookOpen, Users, School, Eye, AlertCircle,
 } from 'lucide-react'
-import { learnersApi, gradesApi } from '@/lib/api'
-import type { Gender, IdType, Relationship, CreateGuardianData } from '@/types'
+import { learnersApi, gradesApi, academicYearsApi } from '@/lib/api'
+import type { AcademicYear, Gender, IdType, Relationship, CreateGuardianData } from '@/types'
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
 const STEPS = [
@@ -382,10 +382,18 @@ function Step4({ form }: { form: ReturnType<typeof useForm<WizardData>> }) {
   const { register, formState: { errors }, watch } = form
   const gradeId = watch('gradeId')
 
-  const { data: grades = [] } = useQuery({
-    queryKey: ['grades'],
-    queryFn:  () => gradesApi.getAll(),
+  const { data: academicYears = [] } = useQuery<AcademicYear[]>({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
     staleTime: 5 * 60_000,
+  })
+  const currentAYId = (academicYears as AcademicYear[]).find((ay) => ay.isCurrent)?.id
+
+  const { data: grades = [] } = useQuery({
+    queryKey: ['grades', currentAYId],
+    queryFn:  () => gradesApi.getAll(currentAYId),
+    staleTime: 5 * 60_000,
+    enabled:  !!currentAYId,
   })
 
   const { data: classes = [] } = useQuery({
@@ -586,10 +594,18 @@ export default function RegisterLearnerPage() {
     },
   })
 
-  const { data: grades = [] } = useQuery({
-    queryKey: ['grades'],
-    queryFn:  () => gradesApi.getAll(),
+  const { data: academicYears = [] } = useQuery<AcademicYear[]>({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
     staleTime: 5 * 60_000,
+  })
+  const currentAYId = (academicYears as AcademicYear[]).find((ay) => ay.isCurrent)?.id
+
+  const { data: grades = [] } = useQuery({
+    queryKey: ['grades', currentAYId],
+    queryFn:  () => gradesApi.getAll(currentAYId),
+    staleTime: 5 * 60_000,
+    enabled:  !!currentAYId,
   })
 
   const gradeId = form.watch('gradeId')

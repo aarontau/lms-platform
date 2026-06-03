@@ -446,11 +446,11 @@ export default function MarkbookPage() {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-900 truncate">
-            {(poa.subject as any)?.name ?? 'Markbook'}
+            {poa.subject?.name ?? 'Markbook'}
           </h1>
           <p className="text-sm text-gray-500">
-            {poa.grade ? `Grade ${(poa.grade as any).gradeNumber}` : ''}
-            {poa.term ? ` · ${(poa.term as any).name}` : ''}
+            {poa.grade ? `Grade ${poa.grade.gradeNumber}` : ''}
+            {poa.term ? ` · ${poa.term.name}` : ''}
             {' · '}
             <span className="font-medium">SBA {(sbaWeight * 100).toFixed(0)}%</span>
             {' / Exam '}

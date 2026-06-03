@@ -1,9 +1,9 @@
-import React from 'react'
+﻿import React from 'react'
 import type { Metadata } from 'next'
 import { GraduationCap, BookOpen, Users, BarChart2 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Sign In — EduTrack LMS',
+  title: 'Sign In — UL-Junior Project',
 }
 
 const FEATURES = [
@@ -30,7 +30,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div className="h-10 w-10 bg-primary-500 rounded-xl flex items-center justify-center shadow-glow-primary flex-shrink-0">
               <GraduationCap className="h-6 w-6 text-white" aria-hidden="true" />
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">EduTrack LMS</span>
+            <span className="text-xl font-bold text-white tracking-tight">UL-Junior Project</span>
           </div>
 
           {/* Headline */}
@@ -58,7 +58,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
           {/* Footer */}
           <p className="text-xs text-primary-600 mt-auto">
-            &copy; {new Date().getFullYear()} EduTrack LMS. All rights reserved.
+            &copy; {new Date().getFullYear()} UL-Junior Project. All rights reserved.
           </p>
         </div>
       </div>
@@ -70,7 +70,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <GraduationCap className="h-4 w-4 text-white" aria-hidden="true" />
           </div>
-          <span className="text-base font-bold text-gray-900">EduTrack LMS</span>
+          <span className="text-base font-bold text-gray-900">UL-Junior Project</span>
         </div>
 
         {/* Centered form */}
@@ -80,7 +80,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Bottom note */}
         <p className="text-center py-4 text-xs text-gray-400 lg:hidden">
-          &copy; {new Date().getFullYear()} EduTrack LMS
+          &copy; {new Date().getFullYear()} UL-Junior Project
         </p>
       </div>
     </div>

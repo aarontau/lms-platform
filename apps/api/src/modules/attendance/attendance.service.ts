@@ -4,13 +4,17 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
+import { PrismaService }           from '../../prisma/prisma.service'
+import { NotificationsService }    from '../notifications/notifications.service'
 import { CreateAttendanceRegisterDto } from './dto/create-attendance-register.dto'
-import { MarkAttendanceDto } from './dto/mark-attendance.dto'
+import { MarkAttendanceDto }       from './dto/mark-attendance.dto'
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma:         PrismaService,
+    private readonly notifications:  NotificationsService,
+  ) {}
 
   // ─── Get or Create Register ──────────────────────────────────────────────────
 
@@ -86,6 +90,10 @@ export class AttendanceService {
   async markAttendance(registerId: string, schoolId: string, dto: MarkAttendanceDto) {
     const register = await this.prisma.attendanceRegister.findFirst({
       where: { id: registerId, schoolId },
+      include: {
+        class:  { select: { id: true, name: true } },
+        school: { select: { name: true } },
+      },
     })
     if (!register) throw new NotFoundException(`Attendance register ${registerId} not found`)
 
@@ -113,6 +121,27 @@ export class AttendanceService {
         })
       )
     )
+
+    // Fire absence alerts asynchronously (do not block the response)
+    const absentIds = dto.records
+      .filter((r) => r.status === 'ABSENT')
+      .map((r) => r.learnerId)
+
+    if (absentIds.length > 0) {
+      const dateStr = (register as any).date
+        ? new Date((register as any).date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('en-ZA')
+      const className  = (register as any).class?.name ?? 'Unknown Class'
+      const schoolName = (register as any).school?.name ?? 'School'
+
+      this.notifications.sendAbsenceAlerts({
+        schoolId,
+        schoolName,
+        className,
+        date: dateStr,
+        absentLearnerIds: absentIds,
+      }).catch((err) => console.error('Absence alert error:', err))
+    }
 
     return { updated: updates.length, registerId }
   }
@@ -222,10 +251,19 @@ export class AttendanceService {
       else if (rec.status === 'EXCUSED_ABSENT') entry.excused += rec._count.status
     }
 
+    // Fetch learner details for display
+    const learnerIds = Array.from(learnerMap.keys())
+    const learners   = await this.prisma.learner.findMany({
+      where:  { id: { in: learnerIds } },
+      select: { id: true, firstName: true, lastName: true, studentNumber: true },
+    })
+    const learnerById = Object.fromEntries(learners.map((l) => [l.id, l]))
+
     const learnerSummaries = Array.from(learnerMap.entries()).map(([learnerId, counts]) => {
       const attended = counts.present + counts.late
       return {
         learnerId,
+        learner: learnerById[learnerId] ?? null,
         ...counts,
         attendancePercent: Math.round((attended / totalDays) * 100),
         isAtRisk: attended / totalDays < 0.8,

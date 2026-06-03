@@ -84,9 +84,9 @@ async function main() {
   // ── 4. School ────────────────────────────────────────────────────────────────
   await prisma.school.upsert({
     where: { id: SCHOOL_ID }, update: {},
-    create: { id: SCHOOL_ID, name: 'Hartrog Academy', emisNumber: 'LP-0001-2024', subdomain: 'hartrog', schoolType: 'INDEPENDENT', status: 'ACTIVE', phone: '015 555 0100', email: 'admin@hartrog.ac.za', address: '12 Academy Drive, Polokwane, 0699', provinceId: 'prov-lp', districtId: 'dist-lp-central', circuitId: 'circuit-polokwane' },
+    create: { id: SCHOOL_ID, name: 'MWED-BUPHEPHUKGAMA', emisNumber: 'LP-0001-2024', subdomain: 'hartrog', schoolType: 'INDEPENDENT', status: 'ACTIVE', phone: '015 555 0100', email: 'admin@hartrog.ac.za', address: '12 Academy Drive, Polokwane, 0699', provinceId: 'prov-lp', districtId: 'dist-lp-central', circuitId: 'circuit-polokwane' },
   })
-  console.log('  ✔  School: Hartrog Academy')
+  console.log('  ✔  School: MWED-BUPHEPHUKGAMA')
 
   // ── 5. Users ─────────────────────────────────────────────────────────────────
   const users = [

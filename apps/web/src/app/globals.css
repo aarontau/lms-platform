@@ -151,6 +151,16 @@
 *::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 999px; }
 *::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+/* Sidebar nav scrollbar — visible on dark background */
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,0.5) transparent;
+}
+.sidebar-nav::-webkit-scrollbar       { width: 3px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.5); border-radius: 999px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.8); }
+
 /* ─── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
@@ -177,6 +187,83 @@
 
 /* ─── Print ──────────────────────────────────────────────────────────────── */
 @media print {
-  .no-print { display: none !important; }
-  body { background: white; }
+  /* Hide navigation and UI chrome */
+  .no-print,
+  aside,          /* sidebar */
+  header,         /* topbar */
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  /* Make the main layout full-width */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove layout constraints */
+  .flex.h-screen { display: block !important; }
+  .flex-1.flex.flex-col.min-w-0.overflow-hidden { display: block !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+
+  /* Page margins */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 18mm;
+  }
+
+  /* Remove shadows and borders for cleaner print */
+  .shadow-md,
+  .shadow-sm,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: none !important;
+  }
+
+  /* Keep borders in print */
+  .print\:border-gray-400 { border-color: #9ca3af !important; }
+
+  /* Ensure table fits on page */
+  table { page-break-inside: avoid; }
+  tr    { page-break-inside: avoid; }
+
+  /* Hide action buttons that don't make sense in print */
+  button { display: none !important; }
+
+  /* Make sure gradient backgrounds print */
+  .bg-gradient-to-r,
+  .bg-gradient-to-br { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ─── Class List print mode ──────────────────────────────────────────────── */
+body.classlist-print-mode .no-print {
+  display: none !important;
+}
+body.classlist-print-mode aside,
+body.classlist-print-mode header {
+  display: none !important;
+}
+body.classlist-print-mode .classlist-print-area {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  background: white !important;
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+@media print {
+  body.classlist-print-mode * { visibility: hidden; }
+  body.classlist-print-mode .classlist-print-area,
+  body.classlist-print-mode .classlist-print-area * { visibility: visible; }
+  body.classlist-print-mode .classlist-print-area {
+    position: absolute !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important;
+  }
+  @page { size: A4 portrait; margin: 12mm 14mm; }
 }

@@ -3,8 +3,8 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Calendar, Plus, Trash2, Clock, AlertCircle, Building2 } from 'lucide-react'
-import { timetableApi, gradesApi, subjectsApi } from '@/lib/api'
-import type { Period, TimetableSlot, Venue } from '@/types'
+import { timetableApi, gradesApi, subjectsApi, academicYearsApi } from '@/lib/api'
+import type { AcademicYear, Grade, Period, SubjectClass, TimetableSlot, Venue } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -203,8 +203,14 @@ export default function TimetablePage() {
   const [addPeriodOpen, setPeriodOpen] = useState(false)
   const [addSlot, setAddSlot]         = useState<Period | null>(null)
 
-  // Hardcoded for now — in production this comes from the session's current academic year
-  const academicYearId = ''
+  // Fetch current academic year so slot creation works
+  const { data: academicYears = [] } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
+    staleTime: 10 * 60_000,
+  })
+  const currentAY  = (academicYears as AcademicYear[]).find((ay) => ay.isCurrent)
+  const academicYearId: string = currentAY?.id ?? ''
 
   const { data: periods = [], isLoading: loadingPeriods } = useQuery({
     queryKey: ['periods'],
@@ -224,11 +230,11 @@ export default function TimetablePage() {
   })
   const { data: grades = [] } = useQuery({
     queryKey: ['grades'],
-    queryFn:  gradesApi.getAll,
+    queryFn:  () => gradesApi.getAll(),
   })
 
-  const allClasses = (grades as any[]).flatMap((g: any) =>
-    (g.classes ?? []).map((c: any) => ({ ...c, grade: g }))
+  const allClasses = (grades as Grade[]).flatMap((g) =>
+    (g.classes ?? []).map((c) => ({ ...c, grade: g }))
   )
 
   const deleteSlot = useMutation({
@@ -279,7 +285,7 @@ export default function TimetablePage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 p-5 shadow-md">
         <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
         <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
-        <Calendar className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[6rem] font-black text-white/10 leading-none select-none" aria-hidden="true">Δt</span>
 
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -499,7 +505,7 @@ export default function TimetablePage() {
           period={addSlot}
           onClose={() => setAddSlot(null)}
           venues={venues as Venue[]}
-          subjectClasses={subjectClasses as any[]}
+          subjectClasses={subjectClasses as SubjectClass[]}
           academicYearId={academicYearId}
         />
       )}

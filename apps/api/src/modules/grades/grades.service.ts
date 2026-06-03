@@ -62,8 +62,9 @@ export class GradesService {
       const grades = await this.prisma.grade.findMany({
         where,
         include: {
-          capsPhase: { select: { id: true, name: true } },
-          academicYear: { select: { id: true, year: true } },
+          capsPhase:   { select: { id: true, name: true } },
+          academicYear:{ select: { id: true, year: true } },
+          classes:     { select: { id: true, name: true, maxCapacity: true }, orderBy: { name: 'asc' } },
         },
         orderBy: { gradeNumber: 'asc' },
       })

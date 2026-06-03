@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState } from 'react'
 import { signIn } from 'next-auth/react'
@@ -76,7 +76,7 @@ export default function LoginPage() {
           <GraduationCap className="h-6 w-6 text-white" aria-hidden="true" />
         </div>
         <div>
-          <p className="text-lg font-bold text-gray-900 leading-tight">EduTrack LMS</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">UL-Junior Project</p>
           <p className="text-xs text-gray-400 leading-tight">School Management Platform</p>
         </div>
       </div>

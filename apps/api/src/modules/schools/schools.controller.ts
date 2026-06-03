@@ -54,6 +54,22 @@ export class SchoolsController {
     return this.schoolsService.findAll()
   }
 
+  // ── Static-path routes MUST come before :id to avoid param capture ────────
+  @Get('my')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
+  @ApiOperation({ summary: 'Get current school profile' })
+  async getMySchool(@Request() req: any) {
+    return this.schoolsService.findOne(req.user.schoolId)
+  }
+
+  @Get('my/stats')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.HOD, Role.TEACHER)
+  @ApiOperation({ summary: 'Get dashboard stats for the current school' })
+  async getDashboardStats(@Request() req: any) {
+    return this.schoolsService.getDashboardStats(req.user.schoolId)
+  }
+
+  // ── Param routes ───────────────────────────────────────────────────────────
   @Get(':id')
   @Roles(Role.SUPER_ADMIN, Role.SCHOOL_ADMIN, Role.PRINCIPAL)
   @ApiOperation({

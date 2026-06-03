@@ -30,6 +30,7 @@ import type {
   AttendanceSummary,
   CreateAttendanceRegisterData,
   MarkAttendanceData,
+  AcademicYear,
   ProgrammeOfAssessment,
   AssessmentTask,
   LearnerMark,
@@ -39,6 +40,13 @@ import type {
   CreateTaskData,
   CaptureMarksData,
   PoaStatus,
+  EnrolmentByGrade,
+  SubjectPerformance,
+  AtRiskLearner,
+  PromotionDecision,
+  ReportCardDetail,
+  FeeStructure,
+  LuritsExportBatch,
 } from '@/types'
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
@@ -108,6 +116,8 @@ export const authApi = {
   login: (email: string, password: string) =>
     post<LoginResponse>('/auth/login', { email, password }),
   getMe: () => get<User>('/auth/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    patch<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
 }
 
 // ─── Schools API ──────────────────────────────────────────────────────────────
@@ -133,10 +143,11 @@ export interface SetupYearData {
 }
 
 export const schoolsApi = {
-  create: (data: CreateSchoolData) => post<School>('/schools', data),
-  getAll: () => get<School[]>('/schools'),
-  getOne: (id: string) => get<School>(`/schools/${id}`),
-  update: (id: string, data: Partial<CreateSchoolData>) =>
+  create:    (data: CreateSchoolData) => post<School>('/schools', data),
+  getAll:    () => get<School[]>('/schools'),
+  getMy:     () => get<School>('/schools/my'),
+  getOne:    (id: string) => get<School>(`/schools/${id}`),
+  update:    (id: string, data: Partial<CreateSchoolData>) =>
     put<School>(`/schools/${id}`, data),
   setupYear: (id: string, data: SetupYearData) =>
     post(`/schools/${id}/setup-year`, data),
@@ -154,9 +165,16 @@ export const usersApi = {
     patch<User>(`/users/${id}/role`, { role }),
 }
 
+// ─── Academic Years API ───────────────────────────────────────────────────────
+export const academicYearsApi = {
+  getAll: () => get<AcademicYear[]>('/academic-years'),
+  getOne: (id: string) => get<AcademicYear>(`/academic-years/${id}`),
+}
+
 // ─── Grades API ───────────────────────────────────────────────────────────────
 export const gradesApi = {
-  getAll:     ()           => get<Grade[]>('/grades'),
+  getAll:     (academicYearId?: string) =>
+    get<Grade[]>('/grades', { params: academicYearId ? { academicYearId } : undefined }),
   getOne:     (id: string) => get<Grade>(`/grades/${id}`),
   getClasses: (gradeId: string) => get<Class[]>(`/grades/${gradeId}/classes`),
 }
@@ -306,9 +324,14 @@ export const reportsApi = {
     classId?:        string
     academicYearId?: string
     status?:         string
-  }) => get<any[]>('/reports/term', { params }),
+    search?:         string
+    page?:           number
+    limit?:          number
+  }) => get<{ data: any[]; meta: { total: number; page: number; limit: number; totalPages: number; publishedCount: number; draftCount: number } }>(
+    '/reports/term', { params }
+  ),
   getReportCard: (id: string) =>
-    get<any>(`/reports/term/${id}`),
+    get<ReportCardDetail>(`/reports/term/${id}`),
   publishReport: (id: string) =>
     patch<any>(`/reports/term/${id}/publish`),
 
@@ -320,7 +343,7 @@ export const reportsApi = {
 
   // Promotion decisions
   listPromotionDecisions: (academicYearId: string, classId?: string) =>
-    get<any[]>('/reports/promotion', { params: { academicYearId, classId } }),
+    get<PromotionDecision[]>('/reports/promotion', { params: { academicYearId, classId } }),
   recordPromotionDecision: (data: {
     learnerId:      string
     academicYearId: string
@@ -334,6 +357,143 @@ export const reportsApi = {
     get<any[]>('/reports/at-risk', { params: termId ? { termId } : undefined }),
 }
 
+// ─── Screening API ────────────────────────────────────────────────────────────
+export const screeningApi = {
+  getIndicators:         (type: string) =>
+    get<Array<{ code: string; text: string }>>(`/screening/indicators/${type}`),
+  submit:                (data: any) =>
+    post<any>('/screening', data),
+  list:                  (params?: {
+    learnerId?: string; screenerType?: string; riskLevel?: string
+    academicYearId?: string; reviewedByPrincipal?: boolean
+  }) => get<any[]>('/screening', { params }),
+  getOne:                (id: string)       => get<any>(`/screening/${id}`),
+  getLearnerScreenings:  (learnerId: string) =>
+    get<any[]>(`/screening/learner/${learnerId}`),
+  review:                (id: string, data: {
+    principalNotes?: string; followUpRecommended: boolean; referralStatus?: string
+  }) => patch<any>(`/screening/${id}/review`, data),
+  getPrincipalSummary:   (academicYearId?: string) =>
+    get<any>('/screening/summary', { params: academicYearId ? { academicYearId } : undefined }),
+}
+
+// ─── HR API ───────────────────────────────────────────────────────────────────
+export const hrApi = {
+  // Recruitment
+  listRecruitments:     (params?: { status?: string; postAppliedFor?: string; search?: string }) =>
+    get<any[]>('/hr/recruitment', { params }),
+  getRecruitment:       (id: string)   => get<any>(`/hr/recruitment/${id}`),
+  createRecruitment:    (data: any)    => post<any>('/hr/recruitment', data),
+  updateRecruitment:    (id: string, data: any) => patch<any>(`/hr/recruitment/${id}`, data),
+  deleteRecruitment:    (id: string)   => del<void>(`/hr/recruitment/${id}`),
+  getRecruitmentStats:  ()             => get<any>('/hr/recruitment/stats'),
+
+  // Staff
+  listStaff:            (params?: { isActive?: boolean; employmentType?: string; postLevel?: string; search?: string }) =>
+    get<any[]>('/hr/staff', { params }),
+  getStaffMember:       (id: string)   => get<any>(`/hr/staff/${id}`),
+  createStaffMember:    (data: any)    => post<any>('/hr/staff', data),
+  updateStaffMember:    (id: string, data: any) => patch<any>(`/hr/staff/${id}`, data),
+  deactivateStaffMember:(id: string)   => patch<any>(`/hr/staff/${id}/deactivate`),
+  getStaffStats:        ()             => get<any>('/hr/staff/stats'),
+}
+
+// ─── Analytics API ────────────────────────────────────────────────────────────
+export const analyticsApi = {
+  getOverview:  (academicYearId?: string) =>
+    get<any>('/analytics/overview', { params: academicYearId ? { academicYearId } : undefined }),
+  getEnrolment: (academicYearId?: string) =>
+    get<EnrolmentByGrade[]>('/analytics/enrolment', { params: academicYearId ? { academicYearId } : undefined }),
+  getAttendance:(termId?: string) =>
+    get<any>('/analytics/attendance', { params: termId ? { termId } : undefined }),
+  getSubjects:  (termId?: string) =>
+    get<SubjectPerformance[]>('/analytics/subjects', { params: termId ? { termId } : undefined }),
+  getAtRisk:    (termId?: string, limit?: number) =>
+    get<AtRiskLearner[]>('/analytics/at-risk', { params: { ...(termId ? { termId } : {}), ...(limit ? { limit } : {}) } }),
+}
+
+// ─── Schools Dashboard Stats API ─────────────────────────────────────────────
+export const dashboardApi = {
+  getStats: () => get<{
+    learnerCount: number
+    teacherCount: number
+    classCount:   number
+    activeTerm:   { id: string; name: string; termNumber: number; startDate: string; endDate: string } | null
+    reports:      { published: number; draft: number }
+    promotion:    { promote: number; progress: number; repeat: number }
+    parentCount:  number
+  }>('/schools/my/stats'),
+}
+
+// ─── LURITS / SA-SAMS Export API ─────────────────────────────────────────────
+export type LuritsExportType = 'LEARNER_DATA' | 'ATTENDANCE' | 'MARKS' | 'EMIS_ANNUAL'
+
+export const luritsApi = {
+  listHistory: () => get<LuritsExportBatch[]>('/lurits/history'),
+  validate:    (academicYearId: string, exportType: LuritsExportType) =>
+    post<{
+      valid:    boolean
+      errors:   string[]
+      warnings: string[]
+      summary:  { learnerCount: number; academicYear: number; exportType: string }
+    }>('/lurits/validate', { academicYearId, exportType }),
+  export: async (academicYearId: string, exportType: LuritsExportType): Promise<{
+    blob: Blob
+    filename: string
+    recordCount: number
+  }> => {
+    const session = await import('next-auth/react').then((m) => m.getSession())
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/lurits/export`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+        },
+        body: JSON.stringify({ academicYearId, exportType }),
+      },
+    )
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as any).message ?? 'Export failed')
+    }
+    const blob     = await res.blob()
+    const cd       = res.headers.get('Content-Disposition') ?? ''
+    const match    = cd.match(/filename="([^"]+)"/)
+    const filename = match?.[1] ?? 'export.csv'
+    const recordCount = parseInt(res.headers.get('X-Record-Count') ?? '0')
+    return { blob, filename, recordCount }
+  },
+}
+
+// ─── Finance API ──────────────────────────────────────────────────────────────
+export const financeApi = {
+  // Fee structures
+  listFees:       (academicYearId?: string) =>
+    get<FeeStructure[]>('/finance/fees', { params: academicYearId ? { academicYearId } : undefined }),
+  createFee:      (data: any) => post<any>('/finance/fees', data),
+  updateFee:      (id: string, data: any) => patch<any>(`/finance/fees/${id}`, data),
+  deleteFee:      (id: string) => del<any>(`/finance/fees/${id}`),
+
+  // Invoices
+  listInvoices:   (params?: {
+    academicYearId?: string; learnerId?: string; status?: string; page?: number; limit?: number
+  }) => get<{ data: any[]; meta: any }>('/finance/invoices', { params }),
+  getInvoice:     (id: string) => get<any>(`/finance/invoices/${id}`),
+  generateInvoice:(data: any) => post<any>('/finance/invoices', data),
+  bulkGenerate:   (data: any) => post<any>('/finance/invoices/bulk', data),
+
+  // Payments
+  recordPayment:  (data: any) => post<any>('/finance/payments', data),
+
+  // Reports
+  getOutstanding: (academicYearId?: string) =>
+    get<any>('/finance/invoices/outstanding', { params: academicYearId ? { academicYearId } : undefined }),
+  getStats:       (academicYearId?: string) =>
+    get<any>('/finance/stats', { params: academicYearId ? { academicYearId } : undefined }),
+}
+
 // ─── Parent Portal API ────────────────────────────────────────────────────────
 export const portalApi = {
   getMyChildren:             ()           => get<any[]>('/portal/children'),
@@ -342,6 +502,17 @@ export const portalApi = {
   getChildAttendance:        (id: string) => get<any>(`/portal/children/${id}/attendance`),
   getChildUpcomingAssessments:(id: string)=> get<any[]>(`/portal/children/${id}/assessments`),
   getChildReports:           (id: string) => get<any[]>(`/portal/children/${id}/reports`),
+}
+
+// ─── Notifications API ────────────────────────────────────────────────────────
+export const notificationsApi = {
+  getAll:        (unreadOnly?: boolean) =>
+    get<any[]>('/notifications', { params: unreadOnly ? { unreadOnly: 'true' } : undefined }),
+  getUnreadCount:() => get<{ count: number }>('/notifications/unread-count'),
+  markAsRead:    (id: string) => patch<any>(`/notifications/${id}/read`),
+  markAllRead:   () => patch<any>('/notifications/read-all'),
+  broadcast:     (data: { title: string; body: string; roles: string[]; type?: string }) =>
+    post<{ sent: number; roles: string[] }>('/notifications/broadcast', data),
 }
 
 export default api

@@ -171,14 +171,14 @@ export class PortalService {
         status: { in: ['ABSENT', 'LATE', 'EXCUSED_ABSENT'] },
       },
       include: {
-        register: {
+        attendanceRegister: {
           select: {
             date:  true,
             class: { select: { name: true, grade: { select: { gradeNumber: true } } } },
           },
         },
       },
-      orderBy: { register: { date: 'desc' } },
+      orderBy: { attendanceRegister: { date: 'desc' } },
       take:    10,
     })
 
@@ -196,11 +196,11 @@ export class PortalService {
       excused,
       attendancePct: total > 0 ? Math.round((present / total) * 100) : null,
       recentAbsences: recentAbsences.map((r) => ({
-        date:      r.register.date,
+        date:      r.attendanceRegister.date,
         status:    r.status,
         notes:     r.notes,
-        className: r.register.class?.name ?? '',
-        grade:     r.register.class?.grade?.gradeNumber ?? null,
+        className: r.attendanceRegister.class?.name ?? '',
+        grade:     r.attendanceRegister.class?.grade?.gradeNumber ?? null,
       })),
     }
   }
@@ -311,7 +311,7 @@ export class PortalService {
           where: {
             schoolId,
             learnerId,
-            register: { termId: currentTerm.id },
+            attendanceRegister: { termId: currentTerm.id },
           },
           _count: true,
         })

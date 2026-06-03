@@ -7,18 +7,22 @@ import {
   ArrowLeft, Edit2, UserPlus, Link2,
   Calendar, MapPin, Globe, BookOpen,
   FileText, AlertTriangle, CheckCircle2, XCircle,
+  BrainCircuit, Plus, ChevronRight, CheckCircle, Clock,
 } from 'lucide-react'
-import { learnersApi } from '@/lib/api'
+import { learnersApi, screeningApi } from '@/lib/api'
 import { GuardianCard } from '@/components/learners/GuardianCard'
-import type { LearnerEnrolment, LearnerStatus } from '@/types'
+import type { Learner, LearnerEnrolment, LearnerStatus } from '@/types'
+import { format } from 'date-fns'
+import Link from 'next/link'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-type Tab = 'profile' | 'guardians' | 'history' | 'documents'
+type Tab = 'profile' | 'guardians' | 'history' | 'screener' | 'documents'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'profile',   label: 'Profile'           },
   { id: 'guardians', label: 'Guardians'          },
   { id: 'history',   label: 'Enrolment History'  },
+  { id: 'screener',  label: 'Screener'           },
   { id: 'documents', label: 'Documents'          },
 ]
 
@@ -73,8 +77,8 @@ function ProfileSkeleton() {
 }
 
 // ─── Profile tab ──────────────────────────────────────────────────────────────
-function ProfileTab({ learner }: { learner: NonNullable<ReturnType<typeof useQuery>['data']> }) {
-  const l = learner as any
+function ProfileTab({ learner }: { learner: Learner }) {
+  const l = learner
   const dob = l.dateOfBirth ? new Date(l.dateOfBirth).toLocaleDateString('en-ZA') : '—'
   const admitted = l.admissionDate ? new Date(l.admissionDate).toLocaleDateString('en-ZA') : '—'
 
@@ -250,13 +254,17 @@ function HistoryTab({ enrolments }: { enrolments: LearnerEnrolment[] }) {
             <div>
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</p>
               <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${
-                e.promotionStatus === 'PROMOTED'
+                e.status === 'ACTIVE'
                   ? 'bg-green-50 text-green-700'
-                  : e.promotionStatus === 'RETAINED'
-                    ? 'bg-red-50 text-red-700'
-                    : 'bg-gray-50 text-gray-600'
+                  : e.status === 'COMPLETED'
+                    ? 'bg-blue-50 text-blue-700'
+                    : e.status === 'WITHDRAWN' || e.status === 'TRANSFERRED_OUT'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-gray-50 text-gray-600'
               }`}>
-                {e.promotionStatus ? e.promotionStatus.replace('_', ' ') : e.isRepeating ? 'Repeating' : 'Enrolled'}
+                {e.isRepeating
+                  ? 'Repeating'
+                  : (e.status ?? 'ACTIVE').replace(/_/g, ' ')}
               </span>
             </div>
           </div>
@@ -266,15 +274,379 @@ function HistoryTab({ enrolments }: { enrolments: LearnerEnrolment[] }) {
   )
 }
 
-// ─── Documents tab ────────────────────────────────────────────────────────────
-function DocumentsTab() {
+// ─── Screener tab ─────────────────────────────────────────────────────────────
+
+const SCREENER_TYPES = [
+  { value: 'DYSLEXIA',         label: 'Dyslexia Screener' },
+  { value: 'ADHD_INATTENTIVE', label: 'ADHD — Inattentive' },
+  { value: 'ADHD_HYPERACTIVE', label: 'ADHD — Hyperactive/Impulsive' },
+  { value: 'ADHD_COMBINED',    label: 'ADHD — Combined' },
+]
+
+const RISK_CLS: Record<string, string> = {
+  HIGH:     'bg-red-50 text-red-700 border border-red-200',
+  MODERATE: 'bg-amber-50 text-amber-700 border border-amber-200',
+  LOW:      'bg-green-50 text-green-700 border border-green-200',
+}
+
+function ScreenerForm({
+  learnerId,
+  onClose,
+}: {
+  learnerId: string
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [step, setStep] = useState<'select' | 'fill'>('select')
+  const [screenerType, setScreenerType] = useState('DYSLEXIA')
+  const [academicYearId, setAcademicYearId] = useState('')
+  const [observations, setObservations] = useState('')
+  const [scores, setScores] = useState<Record<string, number>>({})
+
+  const { data: indicators = [] } = useQuery({
+    queryKey: ['screening-indicators', screenerType],
+    queryFn:  () => screeningApi.getIndicators(screenerType),
+    enabled:  step === 'fill',
+  })
+
+  const submitMut = useMutation({
+    mutationFn: () => screeningApi.submit({
+      learnerId,
+      academicYearId,
+      screenerType,
+      teacherObservations: observations || undefined,
+      responses: indicators.map(ind => ({
+        indicatorCode: ind.code,
+        indicatorText: ind.text,
+        score: scores[ind.code] ?? 0,
+      })),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['learner-screenings', learnerId] })
+      onClose()
+    },
+  })
+
+  const totalScore = Object.values(scores).reduce((s, v) => s + v, 0)
+
   return (
-    <div className="bg-white rounded-xl border border-dashed border-gray-300 py-16 text-center">
-      <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
-      <p className="text-sm font-medium text-gray-500">Document management coming in Week 8</p>
-      <p className="text-xs text-gray-400 mt-1">
-        Report cards, admission letters and LURITS exports will appear here.
-      </p>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-rose-50">
+          <div className="flex items-center gap-2">
+            <BrainCircuit className="h-5 w-5 text-rose-500" />
+            <h3 className="text-base font-bold text-gray-900">New Diagnostic Screener</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {step === 'select' ? (
+            <>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Screener Type *</label>
+                <select
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  value={screenerType}
+                  onChange={e => setScreenerType(e.target.value)}
+                >
+                  {SCREENER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Academic Year ID *</label>
+                <input
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  placeholder="Paste academic year UUID"
+                  value={academicYearId}
+                  onChange={e => setAcademicYearId(e.target.value)}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  You can find this on the Settings page or in the URL of the academic year.
+                </p>
+              </div>
+              <div className="pt-2 flex justify-end">
+                <button
+                  disabled={!academicYearId}
+                  onClick={() => setStep('fill')}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors disabled:opacity-40"
+                >
+                  Continue to Indicators
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-gray-700">
+                  {SCREENER_TYPES.find(t => t.value === screenerType)?.label}
+                </p>
+                <span className="text-xs text-gray-500">
+                  Score: <strong className="text-gray-900">{totalScore}</strong> / {indicators.length * 3}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Rate each indicator: 0 = Never, 1 = Sometimes, 2 = Often, 3 = Very Often
+              </p>
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {indicators.map((ind) => (
+                  <div key={ind.code} className="flex items-start gap-3">
+                    <span className="text-xs font-mono text-gray-400 mt-0.5 w-10 flex-shrink-0">{ind.code}</span>
+                    <p className="flex-1 text-sm text-gray-700">{ind.text}</p>
+                    <div className="flex gap-1 flex-shrink-0">
+                      {[0, 1, 2, 3].map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setScores(s => ({ ...s, [ind.code]: v }))}
+                          className={`h-7 w-7 rounded-lg text-xs font-bold transition-colors ${
+                            (scores[ind.code] ?? 0) === v
+                              ? v === 0 ? 'bg-gray-600 text-white'
+                              : v === 1 ? 'bg-blue-500 text-white'
+                              : v === 2 ? 'bg-amber-500 text-white'
+                              : 'bg-red-500 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Teacher Observations (optional)</label>
+                <textarea
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 h-20 resize-none"
+                  placeholder="Any additional classroom observations…"
+                  value={observations}
+                  onChange={e => setObservations(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-between pt-1">
+                <button onClick={() => setStep('select')}
+                  className="px-4 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                  Back
+                </button>
+                <button
+                  onClick={() => submitMut.mutate()}
+                  disabled={submitMut.isPending}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors disabled:opacity-40"
+                >
+                  {submitMut.isPending ? 'Submitting…' : 'Submit Screener'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScreenerTab({ learnerId }: { learnerId: string }) {
+  const [showForm, setShowForm] = useState(false)
+
+  const { data: screenings = [], isLoading } = useQuery({
+    queryKey: ['learner-screenings', learnerId],
+    queryFn:  () => screeningApi.getLearnerScreenings(learnerId),
+    enabled:  !!learnerId,
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          {screenings.length} screening{screenings.length !== 1 ? 's' : ''} on record
+        </p>
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          New Screener
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2].map(i => <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />)}
+        </div>
+      ) : screenings.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-gray-300 py-14 text-center">
+          <BrainCircuit className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">No screeners recorded</p>
+          <p className="text-xs text-gray-400 mt-1">Use the button above to administer a Dyslexia or ADHD screener.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {screenings.map((s) => (
+            <Link
+              key={s.id}
+              href={`/screening/${s.id}`}
+              className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-primary-200 hover:shadow-sm transition-all"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {SCREENER_TYPES.find(t => t.value === s.screenerType)?.label ?? s.screenerType}
+                    </span>
+                    <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${RISK_CLS[s.riskLevel] ?? 'bg-gray-100 text-gray-500'}`}>
+                      {s.riskLevel} RISK
+                    </span>
+                    {s.reviewedByPrincipal ? (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600">
+                        <CheckCircle className="h-3.5 w-3.5" /> Reviewed
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-amber-600">
+                        <Clock className="h-3.5 w-3.5" /> Pending review
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Score: {s.totalScore} · Administered by {s.administeredBy?.firstName} {s.administeredBy?.lastName}
+                    {' · '}{format(new Date(s.administeredAt), 'd MMM yyyy')}
+                  </p>
+                  {s.principalNotes && (
+                    <p className="text-xs text-gray-400 mt-1 italic">{s.principalNotes}</p>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0 mt-1" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {showForm && <ScreenerForm learnerId={learnerId} onClose={() => setShowForm(false)} />}
+    </div>
+  )
+}
+
+// ─── Documents tab ────────────────────────────────────────────────────────────
+function DocumentsTab({ learner }: { learner: any }) {
+  const idOnFile   = !!(learner.idNumber)
+  const medOnFile  = !!(learner.medicalNotes)
+  const prevSchool = !!(learner.previousSchool)
+
+  type DocStatus = 'on_file' | 'reference' | 'missing'
+
+  const categories: Array<{
+    title: string
+    docs: Array<{ label: string; status: DocStatus; detail?: string }>
+  }> = [
+    {
+      title: 'Identity & Admission',
+      docs: [
+        {
+          label:  learner.idType === 'SA_ID' ? 'SA Identity Number'
+                : learner.idType === 'PASSPORT' ? 'Passport Number'
+                : 'Birth Certificate Number',
+          status: idOnFile ? 'reference' : 'missing',
+          detail: idOnFile ? learner.idNumber : undefined,
+        },
+        {
+          label:  'Admission Record',
+          status: learner.admissionNumber ? 'reference' : 'on_file',
+          detail: learner.admissionNumber ?? `Admitted ${new Date(learner.admissionDate).toLocaleDateString('en-ZA')}`,
+        },
+        {
+          label:  'Previous School Transfer',
+          status: prevSchool ? 'reference' : 'missing',
+          detail: prevSchool ? learner.previousSchool : undefined,
+        },
+      ],
+    },
+    {
+      title: 'Medical & Special Needs',
+      docs: [
+        {
+          label:  'Medical Notes',
+          status: medOnFile ? 'on_file' : 'missing',
+          detail: medOnFile ? 'On record — view in Profile tab' : undefined,
+        },
+        {
+          label:  'Special Needs Assessment',
+          status: learner.hasSpecialNeeds ? 'on_file' : 'missing',
+          detail: learner.hasSpecialNeeds ? 'Learner marked as requiring support' : undefined,
+        },
+      ],
+    },
+    {
+      title: 'Academic Documents',
+      docs: [
+        {
+          label:  'Term Report Cards',
+          status: 'reference',
+          detail: 'View in Reports section',
+        },
+        {
+          label:  'CAPS Screener Reports',
+          status: 'reference',
+          detail: 'View in Screener tab',
+        },
+      ],
+    },
+  ]
+
+  const statusCfg: Record<DocStatus, { label: string; bg: string; text: string; dot: string }> = {
+    on_file:   { label: 'On File',    bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500'  },
+    reference: { label: 'Reference',  bg: 'bg-blue-50',     text: 'text-blue-700',    dot: 'bg-blue-400'     },
+    missing:   { label: 'Missing',    bg: 'bg-gray-50',     text: 'text-gray-500',    dot: 'bg-gray-300'     },
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Status legend */}
+      <div className="flex items-center gap-4 text-xs text-gray-500">
+        {Object.entries(statusCfg).map(([key, cfg]) => (
+          <span key={key} className="flex items-center gap-1.5">
+            <span className={`h-2 w-2 rounded-full ${cfg.dot} inline-block`} />
+            {cfg.label}
+          </span>
+        ))}
+      </div>
+
+      {categories.map((cat) => (
+        <div key={cat.title} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+            <h3 className="text-sm font-semibold text-gray-900">{cat.title}</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {cat.docs.map((doc) => {
+              const cfg = statusCfg[doc.status]
+              return (
+                <div key={doc.label} className="flex items-center gap-4 px-5 py-3.5">
+                  <div className={`flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center ${cfg.bg}`}>
+                    <FileText className={`h-4 w-4 ${cfg.text}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{doc.label}</p>
+                    {doc.detail && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{doc.detail}</p>
+                    )}
+                  </div>
+                  <span className={`flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
+                    {cfg.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Upload notice */}
+      <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center">
+        <FileText className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+        <p className="text-sm font-medium text-gray-500">Physical document upload coming soon</p>
+        <p className="text-xs text-gray-400 mt-1">
+          Scanned copies of ID documents, consent forms, and assessments will be stored here once cloud storage is configured.
+        </p>
+      </div>
     </div>
   )
 }
@@ -424,10 +796,11 @@ export default function LearnerProfilePage() {
 
       {/* ── Tab panels ───────────────────────────────────────────────────── */}
       <div role="tabpanel">
-        {tab === 'profile'   && <ProfileTab   learner={learner as any} />}
+        {tab === 'profile'   && <ProfileTab   learner={learner as Learner} />}
         {tab === 'guardians' && <GuardiansTab learnerId={id} />}
         {tab === 'history'   && <HistoryTab   enrolments={learner.enrolments ?? []} />}
-        {tab === 'documents' && <DocumentsTab />}
+        {tab === 'screener'  && <ScreenerTab  learnerId={id} />}
+        {tab === 'documents' && <DocumentsTab learner={learner} />}
       </div>
     </div>
   )

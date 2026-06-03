@@ -2,11 +2,19 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Body,
   UseGuards,
   Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common'
+import { IsString, MinLength } from 'class-validator'
+
+class ChangePasswordDto {
+  @IsString() currentPassword: string
+  @IsString() @MinLength(8) newPassword: string
+}
 import {
   ApiTags,
   ApiOperation,
@@ -50,12 +58,19 @@ export class AuthController {
     summary: 'Get current user profile',
     description: 'Returns the authenticated user\'s profile. Requires a valid JWT token.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns current user profile without password hash.',
-  })
+  @ApiResponse({ status: 200, description: 'Returns current user profile without password hash.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid JWT token.' })
   async getMe(@Request() req: any) {
     return this.authService.getMe(req.user.id)
+  }
+
+  @Patch('change-password')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change own password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully.' })
+  @ApiResponse({ status: 400, description: 'Current password is incorrect or new password too short.' })
+  async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword)
   }
 }

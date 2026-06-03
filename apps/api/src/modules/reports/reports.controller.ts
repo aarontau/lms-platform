@@ -53,8 +53,15 @@ export class ReportsController {
     @Query('classId')         classId?:         string,
     @Query('academicYearId')  academicYearId?:  string,
     @Query('status')          status?:          string,
+    @Query('search')          search?:          string,
+    @Query('page')            page?:            string,
+    @Query('limit')           limit?:           string,
   ) {
-    return this.svc.listReportCards(user.schoolId, { termId, classId, academicYearId, status })
+    return this.svc.listReportCards(user.schoolId, {
+      termId, classId, academicYearId, status, search,
+      page:  page  ? parseInt(page,  10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
   }
 
   @Get('term/:id')

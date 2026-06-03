@@ -26,6 +26,12 @@ export interface User {
   updatedAt?: string
 }
 
+export interface SchoolRegion {
+  id:   string
+  name: string
+  code?: string
+}
+
 export interface School {
   id: string
   name: string
@@ -37,7 +43,9 @@ export interface School {
   email?: string
   address?: string
   logoUrl?: string
-  province?: string
+  province?: SchoolRegion | string
+  district?: SchoolRegion | string
+  circuit?:  SchoolRegion | string
   createdAt?: string
   updatedAt?: string
   academicYears?: AcademicYear[]
@@ -48,17 +56,21 @@ export interface AcademicYear {
   schoolId: string
   year: number
   isCurrent: boolean
+  startDate?: string
+  endDate?: string
   terms: Term[]
   createdAt?: string
 }
 
 export interface Term {
   id: string
+  schoolId?: string
   academicYearId: string
   termNumber: number
   name: string
   startDate: string
   endDate: string
+  isActive?: boolean
 }
 
 export interface Subject {
@@ -75,6 +87,10 @@ export interface Grade {
   schoolId: string
   gradeNumber: number
   name: string
+  academicYearId?: string
+  capsPhase?: { id: string; name: string; gradeFrom?: number; gradeTo?: number }
+  academicYear?: { id: string; year: number }
+  classes?: Array<{ id: string; name: string; maxCapacity?: number }>
 }
 
 export interface Classroom {
@@ -82,7 +98,7 @@ export interface Classroom {
   schoolId: string
   gradeId: string
   name: string
-  capacity?: number
+  maxCapacity?: number
   grade?: Grade
 }
 
@@ -186,8 +202,10 @@ export interface Class {
   id: string
   schoolId: string
   gradeId: string
+  academicYearId?: string
   name: string
-  capacity?: number
+  maxCapacity?: number
+  classTeacherId?: string
   grade?: Grade
 }
 
@@ -199,12 +217,14 @@ export type Relationship    = 'MOTHER' | 'FATHER' | 'GUARDIAN' | 'GRANDPARENT' |
 
 export interface LearnerEnrolment {
   id: string
+  schoolId?: string
   learnerId: string
   gradeId: string
   classId: string
   academicYearId: string
-  isRepeating: boolean
-  promotionStatus?: string
+  status?: string
+  isRepeating?: boolean
+  promotionStatus?: string // set by joining PromotionDecision — not a DB column on enrolment
   grade?: Grade
   class?: Class
   academicYear?: AcademicYear
@@ -467,6 +487,7 @@ export interface AttendanceSummary {
   excused: number
   attendancePercent: number
   isAtRisk: boolean
+  learner?: { id: string; firstName: string; lastName: string; studentNumber: string } | null
 }
 
 export interface CreateAttendanceRegisterData {
@@ -604,6 +625,30 @@ export interface TermSbaResult {
   isAtRisk:           boolean
   learner?:           Pick<User, 'id' | 'firstName' | 'lastName'> & { admissionNumber?: string }
   term?:              Term
+  subjectClass?:      SubjectClass
+}
+
+export interface ReportCardDetail {
+  card: {
+    id:            string
+    status:        'DRAFT' | 'PUBLISHED'
+    reportType?:   string
+    publishedAt?:  string | null
+    createdAt:     string
+    learner: {
+      id:              string
+      firstName:       string
+      lastName:        string
+      admissionNumber: string | null
+      studentNumber:   string
+      gender?:         string
+    }
+    term?: { id: string; termNumber: number; name: string } | null
+    academicYear?: { id: string; year: number } | null
+    publishedBy?: { id: string; firstName: string; lastName: string } | null
+  }
+  sbaResults:  TermSbaResult[]
+  attendance:  { present: number; absent: number; late: number }
 }
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
@@ -612,6 +657,92 @@ export interface DashboardStats {
   totalTeachers: number
   activeClasses: number
   currentTerm: string | null
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+export interface EnrolmentByGrade {
+  gradeNumber: number
+  name:        string
+  male:        number
+  female:      number
+  total:       number
+}
+
+export interface SubjectPerformance {
+  name:         string
+  code:         string
+  grades:       number[]
+  totalLearners:number
+  atRisk:       number
+  averageSba:   number
+  passRate:     number
+}
+
+export interface AtRiskLearner {
+  learnerId:    string
+  name:         string
+  studentNumber:string
+  grade:        number
+  className:    string
+  atRiskCount:  number
+  subjects:     string[]
+}
+
+// ─── Finance ──────────────────────────────────────────────────────────────────
+export type FeeType          = 'TUITION' | 'REGISTRATION' | 'ACTIVITY' | 'SPORT' | 'OTHER'
+export type BillingFrequency = 'ANNUAL' | 'TERMLY' | 'MONTHLY'
+
+export interface FeeStructure {
+  id:               string
+  schoolId:         string
+  academicYearId:   string
+  name:             string
+  amount:           number
+  feeType:          FeeType
+  gradeId?:         string | null
+  billingFrequency: BillingFrequency
+  isActive:         boolean
+  grade?:           { id: string; name: string; gradeNumber: number } | null
+  createdAt:        string
+  updatedAt:        string
+}
+
+// ─── LURITS ───────────────────────────────────────────────────────────────────
+export type ExportStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED'
+
+export interface LuritsExportBatch {
+  id:             string
+  schoolId:       string
+  academicYearId: string
+  exportType:     'LEARNER_DATA' | 'ATTENDANCE' | 'MARKS' | 'EMIS_ANNUAL'
+  status:         ExportStatus
+  recordCount:    number
+  fileUrl?:       string | null
+  exportedById:   string
+  completedAt?:   string | null
+  createdAt:      string
+  academicYear?:  { id: string; year: number }
+  exportedBy?:    { id: string; firstName: string; lastName: string }
+}
+
+// ─── Promotion ────────────────────────────────────────────────────────────────
+export type PromotionRecommendation = 'PROMOTE' | 'PROGRESS' | 'REPEAT'
+
+export interface PromotionDecision {
+  id:              string
+  schoolId:        string
+  learnerId:       string
+  academicYearId:  string
+  recommendation:  PromotionRecommendation
+  finalDecision:   PromotionRecommendation
+  isOverridden:    boolean
+  overrideReason?: string | null
+  decidedById?:    string | null
+  decidedAt?:      string | null
+  createdAt:       string
+  updatedAt:       string
+  learner?:        { id: string; firstName: string; lastName: string; admissionNumber?: string | null }
+  decidedBy?:      { id: string; firstName: string; lastName: string } | null
 }
 
 // ─── Session extension for NextAuth ──────────────────────────────────────────

@@ -7,8 +7,8 @@ import {
   ClipboardList, Plus, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, BookOpen, Users, Search, ArrowUpRight,
 } from 'lucide-react'
-import { assessmentApi, subjectsApi } from '@/lib/api'
-import type { ProgrammeOfAssessment, PoaStatus, SubjectClass } from '@/types'
+import { assessmentApi, subjectsApi, academicYearsApi } from '@/lib/api'
+import type { AcademicYear, ProgrammeOfAssessment, PoaStatus, SubjectClass } from '@/types'
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<PoaStatus, string> = {
@@ -49,12 +49,16 @@ function CreatePoaModal({
   // Derive available terms from the selected subject class's academic year
   const selectedSc = subjectClasses.find((sc) => sc.id === form.subjectClassId)
 
-  const { data: terms = [] } = useQuery({
-    queryKey: ['terms', selectedSc?.academicYearId],
-    queryFn:  () => fetch(`/api/terms?academicYearId=${selectedSc?.academicYearId}`)
-                      .then((r) => r.json()),
-    enabled:  !!selectedSc?.academicYearId,
+  const { data: academicYears = [] } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn:  () => academicYearsApi.getAll(),
   })
+
+  const terms = React.useMemo(() => {
+    if (!selectedSc?.academicYearId) return []
+    const ay = (academicYears as AcademicYear[]).find((a) => a.id === selectedSc.academicYearId)
+    return ay?.terms ?? []
+  }, [selectedSc?.academicYearId, academicYears])
 
   const mutation = useMutation({
     mutationFn: () => assessmentApi.createPoa(form),
@@ -110,7 +114,7 @@ function CreatePoaModal({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-400"
             >
               <option value="">Select term…</option>
-              {(terms as any[]).map((t: any) => (
+              {terms.map((t: any) => (
                 <option key={t.id} value={t.id}>
                   Term {t.termNumber} — {t.name}
                 </option>
@@ -171,22 +175,22 @@ function PoaCard({ poa }: { poa: ProgrammeOfAssessment }) {
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 text-sm truncate">
-            {(poa.subjectClass as any)?.schoolSubject?.name ?? 'Unknown Subject'}
+            {poa.subjectClass?.schoolSubject?.name ?? 'Unknown Subject'}
           </p>
           <p className="text-xs text-gray-500 mt-0.5">
-            {(poa.subjectClass as any)?.class?.grade
-              ? `Grade ${(poa.subjectClass as any).class.grade.gradeNumber} — `
+            {poa.subjectClass?.class?.grade
+              ? `Grade ${poa.subjectClass.class.grade.gradeNumber} — `
               : ''}
-            {(poa.subjectClass as any)?.class?.name ?? ''}
+            {poa.subjectClass?.class?.name ?? ''}
           </p>
         </div>
         <StatusBadge status={poa.status as PoaStatus} />
       </div>
 
       <p className="text-xs text-gray-500 mb-3">
-        {(poa.term as any)?.name ?? 'Unknown Term'}
-        {(poa.subjectClass as any)?.teacher && (
-          <> &middot; {(poa.subjectClass as any).teacher.firstName} {(poa.subjectClass as any).teacher.lastName}</>
+        {poa.term?.name ?? 'Unknown Term'}
+        {poa.subjectClass?.teacher && (
+          <> &middot; {poa.subjectClass.teacher.firstName} {poa.subjectClass.teacher.lastName}</>
         )}
       </p>
 
@@ -235,13 +239,12 @@ export default function AssessmentPage() {
   const filtered = (poas as ProgrammeOfAssessment[]).filter((p) => {
     if (!search) return true
     const q = search.toLowerCase()
-    const sc = p.subjectClass as any
     return (
-      sc?.schoolSubject?.name?.toLowerCase().includes(q) ||
-      sc?.class?.name?.toLowerCase().includes(q) ||
-      sc?.teacher?.firstName?.toLowerCase().includes(q) ||
-      sc?.teacher?.lastName?.toLowerCase().includes(q) ||
-      (p.term as any)?.name?.toLowerCase().includes(q)
+      p.subjectClass?.schoolSubject?.name?.toLowerCase().includes(q) ||
+      p.subjectClass?.class?.name?.toLowerCase().includes(q) ||
+      p.subjectClass?.teacher?.firstName?.toLowerCase().includes(q) ||
+      p.subjectClass?.teacher?.lastName?.toLowerCase().includes(q) ||
+      p.term?.name?.toLowerCase().includes(q)
     )
   })
 
@@ -259,7 +262,7 @@ export default function AssessmentPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 p-5 shadow-md">
         <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10" />
         <div className="absolute right-4 bottom-4 h-16 w-16 rounded-full bg-white/5" />
-        <ClipboardList className="absolute right-5 bottom-3 h-20 w-20 text-white/10" aria-hidden="true" />
+        <span className="absolute right-4 bottom-1 text-[5rem] font-black text-white/10 leading-none select-none" aria-hidden="true">∑/n</span>
 
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

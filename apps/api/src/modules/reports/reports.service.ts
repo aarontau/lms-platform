@@ -17,9 +17,10 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { GenerateTermReportsDto } from './dto/generate-term-report.dto'
-import { CalculateAnnualResultsDto } from './dto/calculate-annual.dto'
+import { PrismaService }              from '../../prisma/prisma.service'
+import { NotificationsService }       from '../notifications/notifications.service'
+import { GenerateTermReportsDto }     from './dto/generate-term-report.dto'
+import { CalculateAnnualResultsDto }  from './dto/calculate-annual.dto'
 import { RecordPromotionDecisionDto, PromotionRecommendation } from './dto/promotion-decision.dto'
 import {
   calculateAnnualResult,
@@ -28,7 +29,10 @@ import {
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma:        PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // ── 1. Generate term report cards ─────────────────────────────────────────
 
@@ -102,6 +106,9 @@ export class ReportsService {
       classId?:        string
       academicYearId?: string
       status?:         string
+      page?:           number
+      limit?:          number
+      search?:         string
     },
   ) {
     // If filtering by classId, get learner IDs enrolled in that class
@@ -113,35 +120,96 @@ export class ReportsService {
         select: { learnerId: true },
       })
       learnerIdFilter = enrolments.map((e) => e.learnerId)
-      if (learnerIdFilter.length === 0) return []
+      if (learnerIdFilter.length === 0) {
+        return { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } }
+      }
     }
 
-    return this.prisma.reportCard.findMany({
-      where: {
-        schoolId,
-        ...(filters.termId         && { termId:         filters.termId         }),
-        ...(filters.academicYearId && { academicYearId: filters.academicYearId }),
-        ...(filters.status         && { status:         filters.status as any  }),
-        ...(learnerIdFilter        && { learnerId:       { in: learnerIdFilter } }),
-      },
-      include: {
-        learner: {
-          select: {
-            id:              true,
-            firstName:       true,
-            lastName:        true,
-            admissionNumber: true,
+    const page  = Math.max(1, filters.page  ?? 1)
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 20))
+    const skip  = (page - 1) * limit
+
+    const where: any = {
+      schoolId,
+      ...(filters.termId         && { termId:         filters.termId         }),
+      ...(filters.academicYearId && { academicYearId: filters.academicYearId }),
+      ...(filters.status         && { status:         filters.status as any  }),
+      ...(learnerIdFilter        && { learnerId:       { in: learnerIdFilter } }),
+    }
+
+    // Name search via learner relation
+    if (filters.search) {
+      const q = filters.search.trim()
+      where.learner = {
+        OR: [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName:  { contains: q, mode: 'insensitive' } },
+        ],
+      }
+    }
+
+    // Build base where without status filter for status counts
+    const whereBase: any = {
+      schoolId,
+      ...(filters.termId         && { termId:         filters.termId         }),
+      ...(filters.academicYearId && { academicYearId: filters.academicYearId }),
+      ...(learnerIdFilter        && { learnerId:       { in: learnerIdFilter } }),
+    }
+    if (filters.search) {
+      const q = filters.search.trim()
+      whereBase.learner = {
+        OR: [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName:  { contains: q, mode: 'insensitive' } },
+        ],
+      }
+    }
+
+    const [total, data, statusCounts] = await Promise.all([
+      this.prisma.reportCard.count({ where }),
+      this.prisma.reportCard.findMany({
+        where,
+        include: {
+          learner: {
+            select: {
+              id:              true,
+              firstName:       true,
+              lastName:        true,
+              admissionNumber: true,
+            },
           },
+          term:        { select: { id: true, name: true, termNumber: true } },
+          academicYear:{ select: { id: true, year: true } },
+          publishedBy: { select: { id: true, firstName: true, lastName: true } },
         },
-        term:        { select: { id: true, name: true, termNumber: true } },
-        academicYear:{ select: { id: true, year: true } },
-        publishedBy: { select: { id: true, firstName: true, lastName: true } },
+        orderBy: [
+          { term: { termNumber: 'asc' } },
+          { learner: { lastName: 'asc' } },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.reportCard.groupBy({
+        by:    ['status'],
+        where: whereBase,
+        _count: true,
+      }),
+    ])
+
+    const publishedCount = statusCounts.find((s) => s.status === 'PUBLISHED')?._count ?? 0
+    const draftCount     = statusCounts.find((s) => s.status === 'DRAFT')?._count     ?? 0
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages:    Math.ceil(total / limit),
+        publishedCount,
+        draftCount,
       },
-      orderBy: [
-        { term: { termNumber: 'asc' } },
-        { learner: { lastName: 'asc' } },
-      ],
-    })
+    }
   }
 
   // ── 3. Get one report card (full detail) ──────────────────────────────────
@@ -185,7 +253,7 @@ export class ReportsService {
       where: {
         schoolId,
         learnerId: card.learnerId,
-        register:  { termId: card.termId ?? undefined },
+        attendanceRegister: { termId: card.termId ?? undefined },
       },
       _count: true,
     })
@@ -204,6 +272,10 @@ export class ReportsService {
   async publishReport(id: string, schoolId: string, userId: string) {
     const card = await this.prisma.reportCard.findFirst({
       where: { id, schoolId },
+      include: {
+        term:   { select: { name: true } },
+        school: { select: { name: true } },
+      },
     })
     if (!card) throw new NotFoundException('Report card not found')
 
@@ -211,7 +283,7 @@ export class ReportsService {
       throw new BadRequestException('Report card is already published')
     }
 
-    return this.prisma.reportCard.update({
+    const updated = await this.prisma.reportCard.update({
       where: { id },
       data: {
         status:        'PUBLISHED',
@@ -219,6 +291,18 @@ export class ReportsService {
         publishedById: userId,
       },
     })
+
+    // Fire report card notification asynchronously
+    const termName   = (card as any).term?.name ?? 'Term'
+    const schoolName = (card as any).school?.name ?? 'School'
+    this.notifications.sendReportCardNotification({
+      schoolId,
+      schoolName,
+      learnerId: card.learnerId,
+      termName,
+    }).catch((err) => console.error('Report card notification error:', err))
+
+    return updated
   }
 
   // ── 5. Calculate annual results ───────────────────────────────────────────

@@ -195,13 +195,13 @@ export default function ChildDetailPage() {
                 <div key={i} className="h-28 bg-white rounded-2xl border border-gray-200 animate-pulse" />
               ))}
             </div>
-          ) : (marks as any[]).length === 0 ? (
+          ) : marks.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-16 text-center">
               <BarChart2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-500">No marks captured yet for this learner.</p>
             </div>
           ) : (
-            (marks as any[]).map((subject) => (
+            marks.map((subject) => (
               <div key={subject.subjectId} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-primary-500 flex-shrink-0" />
@@ -304,14 +304,14 @@ export default function ChildDetailPage() {
                 <div key={i} className="h-20 bg-white rounded-xl border border-gray-200 animate-pulse" />
               ))}
             </div>
-          ) : (assessments as any[]).length === 0 ? (
+          ) : assessments.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-16 text-center">
               <CheckCircle2 className="h-10 w-10 text-emerald-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">No upcoming assessments right now.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {(assessments as any[]).map((task) => {
+              {assessments.map((task) => {
                 const dueDate  = task.dueDate ? new Date(task.dueDate) : null
                 const isPast   = dueDate && dueDate < new Date()
                 const isUrgent = dueDate && !isPast && (dueDate.getTime() - Date.now()) < 1000 * 60 * 60 * 48
@@ -359,7 +359,7 @@ export default function ChildDetailPage() {
                 <div key={i} className="h-24 bg-white rounded-xl border border-gray-200 animate-pulse" />
               ))}
             </div>
-          ) : (reports as any[]).length === 0 ? (
+          ) : reports.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 py-16 text-center">
               <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-500">No published report cards yet.</p>
@@ -367,7 +367,7 @@ export default function ChildDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {(reports as any[]).map((card) => (
+              {reports.map((card) => (
                 <div key={card.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
                   <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-rose-50 flex items-center justify-center">
                     <FileText className="h-5 w-5 text-rose-500" />
